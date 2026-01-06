@@ -31,10 +31,41 @@ function App() {
     }
   };
 
+  // Sanitize bot config for IPC transfer (remove non-serializable data)
+  const sanitizeBotConfig = (bot) => {
+    const sanitized = { ...bot };
+
+    // Clean events and their flowData
+    if (sanitized.events) {
+      sanitized.events = sanitized.events.map(event => {
+        if (!event.flowData) return event;
+
+        return {
+          ...event,
+          flowData: {
+            nodes: event.flowData.nodes.map(node => ({
+              ...node,
+              data: {
+                ...node.data,
+                // Remove onUpdate function and other non-serializable properties
+                onUpdate: undefined,
+              }
+            })),
+            edges: event.flowData.edges
+          }
+        };
+      });
+    }
+
+    return sanitized;
+  };
+
   const saveBots = async (newBots) => {
     setBots(newBots);
     if (window.electron) {
-      await window.electron.saveBots(newBots);
+      // Sanitize all bots before saving
+      const sanitizedBots = newBots.map(sanitizeBotConfig);
+      await window.electron.saveBots(sanitizedBots);
     }
   };
 
@@ -87,7 +118,9 @@ function App() {
     }
 
     if (window.electron) {
-      const result = await window.electron.startBot(botId, bot);
+      // Sanitize bot config before sending through IPC
+      const sanitizedBot = sanitizeBotConfig(bot);
+      const result = await window.electron.startBot(botId, sanitizedBot);
       if (result.success) {
         setRunningBots((prev) => new Set([...prev, botId]));
         addLog({
