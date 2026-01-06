@@ -41,6 +41,7 @@ const DATA_NODES = [
     inputs: [],
     outputs: [{ id: 'value', type: 'BOOLEAN' }],
     config: { value: true },
+    tags: ['constant', 'boolean', 'value', 'static', 'true', 'false'],
   },
   {
     type: 'static-number',
@@ -50,6 +51,7 @@ const DATA_NODES = [
     inputs: [],
     outputs: [{ id: 'value', type: 'NUMBER' }],
     config: { value: 0 },
+    tags: ['constant', 'number', 'value', 'static', 'integer', 'decimal'],
   },
   {
     type: 'static-string',
@@ -59,6 +61,7 @@ const DATA_NODES = [
     inputs: [],
     outputs: [{ id: 'value', type: 'STRING' }],
     config: { value: '' },
+    tags: ['constant', 'string', 'text', 'value', 'static', 'message'],
   },
   // Discord data extractors
   {
@@ -68,6 +71,7 @@ const DATA_NODES = [
     color: '#f23f43',
     inputs: [{ id: 'user', type: 'USER' }],
     outputs: [{ id: 'name', type: 'STRING' }],
+    tags: ['user', 'name', 'username', 'discord', 'member'],
   },
   {
     type: 'get-user-avatar',
@@ -76,6 +80,7 @@ const DATA_NODES = [
     color: '#f23f43',
     inputs: [{ id: 'user', type: 'USER' }],
     outputs: [{ id: 'url', type: 'STRING' }],
+    tags: ['user', 'avatar', 'picture', 'image', 'profile', 'pfp'],
   },
   {
     type: 'get-user-id',
@@ -84,6 +89,7 @@ const DATA_NODES = [
     color: '#f23f43',
     inputs: [{ id: 'user', type: 'USER' }],
     outputs: [{ id: 'id', type: 'STRING' }],
+    tags: ['user', 'id', 'identifier', 'snowflake'],
   },
   {
     type: 'get-channel-name',
@@ -92,6 +98,7 @@ const DATA_NODES = [
     color: '#43b581',
     inputs: [{ id: 'channel', type: 'CHANNEL' }],
     outputs: [{ id: 'name', type: 'STRING' }],
+    tags: ['channel', 'name', 'discord'],
   },
   {
     type: 'get-channel-id',
@@ -100,6 +107,7 @@ const DATA_NODES = [
     color: '#43b581',
     inputs: [{ id: 'channel', type: 'CHANNEL' }],
     outputs: [{ id: 'id', type: 'STRING' }],
+    tags: ['channel', 'id', 'identifier', 'snowflake'],
   },
   {
     type: 'get-guild-name',
@@ -108,6 +116,7 @@ const DATA_NODES = [
     color: '#7289da',
     inputs: [{ id: 'guild', type: 'GUILD' }],
     outputs: [{ id: 'name', type: 'STRING' }],
+    tags: ['guild', 'server', 'name', 'discord'],
   },
   // Utility nodes
   {
@@ -120,6 +129,7 @@ const DATA_NODES = [
       { id: 'string2', type: 'STRING' },
     ],
     outputs: [{ id: 'result', type: 'STRING' }],
+    tags: ['string', 'text', 'join', 'combine', 'concatenate', 'merge'],
   },
   {
     type: 'number-to-string',
@@ -128,6 +138,7 @@ const DATA_NODES = [
     color: '#00aff4',
     inputs: [{ id: 'number', type: 'NUMBER' }],
     outputs: [{ id: 'string', type: 'STRING' }],
+    tags: ['convert', 'number', 'string', 'text', 'transform'],
   },
   {
     type: 'add-numbers',
@@ -139,6 +150,7 @@ const DATA_NODES = [
       { id: 'b', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'NUMBER' }],
+    tags: ['math', 'number', 'add', 'plus', 'sum', 'addition', 'calculate'],
   },
   {
     type: 'subtract-numbers',
@@ -150,6 +162,7 @@ const DATA_NODES = [
       { id: 'b', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'NUMBER' }],
+    tags: ['math', 'number', 'subtract', 'minus', 'difference', 'calculate'],
   },
   {
     type: 'multiply-numbers',
@@ -161,6 +174,7 @@ const DATA_NODES = [
       { id: 'b', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'NUMBER' }],
+    tags: ['math', 'number', 'multiply', 'times', 'product', 'calculate'],
   },
   {
     type: 'divide-numbers',
@@ -172,6 +186,7 @@ const DATA_NODES = [
       { id: 'b', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'NUMBER' }],
+    tags: ['math', 'number', 'divide', 'division', 'quotient', 'calculate'],
   },
   {
     type: 'check-has-role',
@@ -183,6 +198,7 @@ const DATA_NODES = [
       { id: 'roleId', type: 'STRING' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['role', 'permission', 'check', 'user', 'has', 'member'],
   },
   {
     type: 'string-length',
@@ -191,6 +207,7 @@ const DATA_NODES = [
     color: '#faa61a',
     inputs: [{ id: 'string', type: 'STRING' }],
     outputs: [{ id: 'length', type: 'NUMBER' }],
+    tags: ['string', 'text', 'length', 'size', 'count', 'measure'],
   },
   {
     type: 'string-contains',
@@ -202,6 +219,7 @@ const DATA_NODES = [
       { id: 'search', type: 'STRING' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['string', 'text', 'contains', 'search', 'find', 'includes', 'check'],
   },
   {
     type: 'string-lowercase',
@@ -210,6 +228,7 @@ const DATA_NODES = [
     color: '#faa61a',
     inputs: [{ id: 'string', type: 'STRING' }],
     outputs: [{ id: 'result', type: 'STRING' }],
+    tags: ['string', 'text', 'lowercase', 'lower', 'case', 'transform'],
   },
   {
     type: 'string-uppercase',
@@ -218,6 +237,7 @@ const DATA_NODES = [
     color: '#faa61a',
     inputs: [{ id: 'string', type: 'STRING' }],
     outputs: [{ id: 'result', type: 'STRING' }],
+    tags: ['string', 'text', 'uppercase', 'upper', 'case', 'caps', 'transform'],
   },
   {
     type: 'number-greater-than',
@@ -229,6 +249,7 @@ const DATA_NODES = [
       { id: 'b', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['number', 'compare', 'greater', 'larger', 'more', 'check', 'condition'],
   },
   {
     type: 'number-less-than',
@@ -240,6 +261,7 @@ const DATA_NODES = [
       { id: 'b', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['number', 'compare', 'less', 'smaller', 'fewer', 'check', 'condition'],
   },
   {
     type: 'number-equals',
@@ -251,6 +273,7 @@ const DATA_NODES = [
       { id: 'b', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['number', 'compare', 'equals', 'same', 'equal', 'check', 'condition'],
   },
   {
     type: 'compare-strings',
@@ -262,6 +285,7 @@ const DATA_NODES = [
       { id: 'b', type: 'STRING' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['string', 'text', 'compare', 'equals', 'same', 'check', 'match'],
   },
   {
     type: 'boolean-not',
@@ -270,6 +294,7 @@ const DATA_NODES = [
     color: '#ed4245',
     inputs: [{ id: 'value', type: 'BOOLEAN' }],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['boolean', 'not', 'invert', 'opposite', 'negate', 'logic'],
   },
   {
     type: 'boolean-and',
@@ -281,6 +306,7 @@ const DATA_NODES = [
       { id: 'b', type: 'BOOLEAN' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['boolean', 'and', 'both', 'logic', 'condition', 'check'],
   },
   {
     type: 'boolean-or',
@@ -292,6 +318,7 @@ const DATA_NODES = [
       { id: 'b', type: 'BOOLEAN' },
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
+    tags: ['boolean', 'or', 'either', 'logic', 'condition', 'check'],
   },
   {
     type: 'random-number',
@@ -303,6 +330,7 @@ const DATA_NODES = [
       { id: 'max', type: 'NUMBER' },
     ],
     outputs: [{ id: 'result', type: 'NUMBER' }],
+    tags: ['random', 'number', 'rng', 'dice', 'chance', 'generate'],
   },
   {
     type: 'string-to-number',
@@ -311,6 +339,7 @@ const DATA_NODES = [
     color: '#00aff4',
     inputs: [{ id: 'string', type: 'STRING' }],
     outputs: [{ id: 'number', type: 'NUMBER' }],
+    tags: ['convert', 'string', 'number', 'text', 'transform', 'parse'],
   },
   {
     type: 'get-member-count',
@@ -319,6 +348,7 @@ const DATA_NODES = [
     color: '#00aff4',
     inputs: [{ id: 'guild', type: 'GUILD' }],
     outputs: [{ id: 'count', type: 'NUMBER' }],
+    tags: ['guild', 'server', 'members', 'count', 'users', 'size'],
   },
 ];
 
@@ -334,6 +364,7 @@ const ACTION_TYPES = [
       { id: 'flow', type: 'FLOW' },
       { id: 'content', type: 'STRING', optional: true },
     ],
+    tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk'],
   },
   {
     type: 'embed',
@@ -364,6 +395,7 @@ const ACTION_TYPES = [
       { id: 'thumbnail', type: 'STRING', optional: true },
       { id: 'image', type: 'STRING', optional: true },
     ],
+    tags: ['embed', 'message', 'rich', 'fancy', 'formatted', 'card'],
   },
   {
     type: 'add-role',
@@ -372,6 +404,7 @@ const ACTION_TYPES = [
     color: '#faa81a',
     defaultData: { roleId: '' },
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    tags: ['role', 'add', 'give', 'assign', 'permission', 'member'],
   },
   {
     type: 'remove-role',
@@ -380,6 +413,7 @@ const ACTION_TYPES = [
     color: '#ed4245',
     defaultData: { roleId: '' },
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    tags: ['role', 'remove', 'take', 'revoke', 'permission', 'member'],
   },
   {
     type: 'send-dm',
@@ -392,6 +426,7 @@ const ACTION_TYPES = [
       { id: 'user', type: 'USER', optional: true },
       { id: 'content', type: 'STRING', optional: true },
     ],
+    tags: ['dm', 'direct', 'message', 'private', 'send', 'whisper', 'pm'],
   },
   {
     type: 'react-emoji',
@@ -400,6 +435,7 @@ const ACTION_TYPES = [
     color: '#f39c12',
     defaultData: { emoji: '👍' },
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    tags: ['react', 'reaction', 'emoji', 'emoticon', 'response'],
   },
   {
     type: 'branch',
@@ -415,6 +451,7 @@ const ACTION_TYPES = [
       { id: 'true', type: 'FLOW', label: 'True' },
       { id: 'false', type: 'FLOW', label: 'False' },
     ],
+    tags: ['branch', 'if', 'condition', 'check', 'conditional', 'split', 'decision'],
   },
 ];
 
@@ -432,6 +469,26 @@ function FlowEventEditor({ event, onSave, onClose }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState(eventConfig.flowData?.edges || []);
   const [selectedNode, setSelectedNode] = useState(null);
   const [loopWarning, setLoopWarning] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filter nodes based on search term
+  const filterNodes = (nodes) => {
+    if (!searchTerm.trim()) return nodes;
+
+    const term = searchTerm.toLowerCase();
+    return nodes.filter(node => {
+      // Search in label
+      if (node.label.toLowerCase().includes(term)) return true;
+
+      // Search in tags
+      if (node.tags && node.tags.some(tag => tag.toLowerCase().includes(term))) return true;
+
+      return false;
+    });
+  };
+
+  const filteredDataNodes = filterNodes(DATA_NODES);
+  const filteredActionNodes = filterNodes(ACTION_TYPES);
 
   // Auto-add trigger node if it doesn't exist
   useEffect(() => {
@@ -869,6 +926,19 @@ function FlowEventEditor({ event, onSave, onClose }) {
             )}
           </div>
 
+          <div className="node-search">
+            <input
+              type="text"
+              placeholder="🔍 Search nodes... (try 'user', 'message', 'math', etc.)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+            {searchTerm && (
+              <button onClick={() => setSearchTerm('')} className="clear-search">×</button>
+            )}
+          </div>
+
           <div className="data-types-legend">
             <h4>Data Types</h4>
             {Object.entries(DATA_TYPES).map(([key, value]) => (
@@ -880,10 +950,10 @@ function FlowEventEditor({ event, onSave, onClose }) {
           </div>
 
           <div className="actions-palette">
-            <h4>Data Nodes</h4>
+            <h4>Data Nodes {searchTerm && `(${filteredDataNodes.length})`}</h4>
             <p className="palette-description">Convert data types</p>
             <div className="action-type-list">
-              {DATA_NODES.map((dataNode) => (
+              {filteredDataNodes.map((dataNode) => (
                 <button
                   key={dataNode.type}
                   className="action-type-button"
@@ -898,10 +968,10 @@ function FlowEventEditor({ event, onSave, onClose }) {
           </div>
 
           <div className="actions-palette">
-            <h4>Action Nodes</h4>
+            <h4>Action Nodes {searchTerm && `(${filteredActionNodes.length})`}</h4>
             <p className="palette-description">Execute actions</p>
             <div className="action-type-list">
-              {ACTION_TYPES.map((actionType) => (
+              {filteredActionNodes.map((actionType) => (
                 <button
                   key={actionType.type}
                   className="action-type-button"

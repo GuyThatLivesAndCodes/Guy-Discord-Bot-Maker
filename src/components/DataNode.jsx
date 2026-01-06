@@ -41,7 +41,7 @@ const DataNode = ({ id, data }) => {
       </div>
 
       {isExpanded && hasConfig && (
-        <div className="data-node-config" style={{ padding: '10px', background: '#1e1e1e' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="data-node-config nodrag" style={{ padding: '10px', background: '#1e1e1e' }} onMouseDown={(e) => e.stopPropagation()}>
           {data.nodeType === 'static-boolean' && (
             <label style={{ display: 'flex', alignItems: 'center', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>
               <input
