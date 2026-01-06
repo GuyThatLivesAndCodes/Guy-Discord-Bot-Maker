@@ -1,0 +1,315 @@
+.command-builder {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.builder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 30px;
+}
+
+.builder-header h2 {
+  margin-bottom: 8px;
+}
+
+.builder-header p {
+  color: #b5bac1;
+  font-size: 14px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: #2b2d31;
+  border-radius: 8px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.empty-state h3 {
+  margin-bottom: 10px;
+  color: #ffffff;
+}
+
+.empty-state p {
+  color: #b5bac1;
+  margin-bottom: 30px;
+}
+
+.commands-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.command-card {
+  background: #2b2d31;
+  border-radius: 8px;
+  padding: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.command-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.command-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.command-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #5865f2;
+  font-family: 'Courier New', monospace;
+}
+
+.command-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.command-actions button {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.command-description {
+  color: #b5bac1;
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.command-stats {
+  display: flex;
+  gap: 15px;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #80848e;
+  font-size: 13px;
+}
+
+.stat-icon {
+  font-size: 14px;
+}
+
+/* Command Editor */
+.command-editor {
+  background: #2b2d31;
+  border-radius: 8px;
+  padding: 30px;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #383a40;
+}
+
+.editor-header h3 {
+  margin: 0;
+  color: #ffffff;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.editor-content {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 30px;
+}
+
+.editor-left {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.actions-palette {
+  background: #1e1e1e;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.actions-palette h4 {
+  margin-bottom: 8px;
+  color: #ffffff;
+}
+
+.palette-description {
+  color: #80848e;
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.action-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.action-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #2b2d31;
+  padding: 12px 15px;
+  border-radius: 6px;
+  cursor: move;
+  transition: all 0.2s;
+}
+
+.action-block:hover {
+  transform: translateX(5px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.action-icon {
+  font-size: 20px;
+}
+
+.action-label {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.editor-right {
+  min-height: 400px;
+}
+
+.actions-dropzone {
+  background: #1e1e1e;
+  border: 2px dashed #383a40;
+  border-radius: 8px;
+  min-height: 400px;
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.actions-dropzone.dragover {
+  border-color: #5865f2;
+  background: #252729;
+  box-shadow: 0 0 20px rgba(88, 101, 242, 0.2);
+}
+
+.actions-dropzone.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dropzone-placeholder {
+  text-align: center;
+  color: #80848e;
+}
+
+.placeholder-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.dropzone-placeholder p {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.dropzone-placeholder small {
+  font-size: 13px;
+  color: #5e6167;
+}
+
+.actions-list h4 {
+  margin-bottom: 15px;
+  color: #ffffff;
+}
+
+.command-action-item {
+  background: #2b2d31;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 15px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.action-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.action-item-header .action-label {
+  flex: 1;
+}
+
+.remove-action-btn {
+  background: #ed4245;
+  color: white;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.remove-action-btn:hover {
+  background: #c13538;
+  transform: scale(1.1);
+}
+
+.action-config {
+  padding-left: 30px;
+}
+
+.action-config .form-group {
+  margin-bottom: 15px;
+}
+
+.action-config .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.action-config label {
+  font-size: 11px;
+}
+
+.action-config input,
+.action-config textarea {
+  width: 100%;
+  font-size: 13px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

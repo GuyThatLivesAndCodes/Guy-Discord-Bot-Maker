@@ -1,0 +1,81 @@
+.bot-config {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.config-section {
+  background: #2b2d31;
+  border-radius: 8px;
+  padding: 30px;
+  margin-bottom: 20px;
+}
+
+.config-section h2 {
+  margin-bottom: 10px;
+  color: #ffffff;
+}
+
+.section-description {
+  color: #b5bac1;
+  margin-bottom: 30px;
+  line-height: 1.5;
+}
+
+.form-group {
+  margin-bottom: 25px;
+}
+
+.form-group label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.form-group input {
+  width: 100%;
+}
+
+.form-group small {
+  display: block;
+  margin-top: 5px;
+  color: #80848e;
+  font-size: 12px;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: #5865f2;
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  cursor: help;
+}
+
+.help-section h3 {
+  margin-bottom: 15px;
+  color: #ffffff;
+}
+
+.help-section ol {
+  padding-left: 20px;
+  color: #b5bac1;
+  line-height: 1.8;
+}
+
+.help-section ol li {
+  margin-bottom: 8px;
+}
+
+.help-section a {
+  color: #00aff4;
+  text-decoration: none;
+}
+
+.help-section a:hover {
+  text-decoration: underline;
+}
