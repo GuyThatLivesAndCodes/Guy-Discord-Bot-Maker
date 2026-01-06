@@ -256,3 +256,43 @@
   border-radius: 50%;
   border: 2px solid #1e1e1e;
 }
+
+/* Command Options */
+.command-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.command-option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: #2b2d31;
+  border-radius: 6px;
+  border: 1px solid #383a40;
+}
+
+.command-option-item input[type="text"] {
+  background: #1e1e1e;
+  border: 1px solid #383a40;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.command-option-item select {
+  background: #1e1e1e;
+  border: 1px solid #383a40;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.command-option-item input[type="checkbox"] {
+  cursor: pointer;
+}

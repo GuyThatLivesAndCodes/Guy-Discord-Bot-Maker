@@ -436,6 +436,20 @@ function FlowEventEditor({ event, onSave, onClose }) {
   // Auto-add trigger node if it doesn't exist
   useEffect(() => {
     if (nodes.length === 0 || !nodes.find(n => n.type === 'triggerNode')) {
+      const baseOutputs = [
+        { id: 'flow', type: 'FLOW', label: 'Flow' },
+        { id: 'user', type: 'USER', label: 'User' },
+        { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+        { id: 'guild', type: 'GUILD', label: 'Guild' },
+      ];
+
+      // Add command options as outputs
+      const optionOutputs = (eventConfig.options || []).map(option => ({
+        id: `option-${option.name}`,
+        type: option.type,
+        label: option.name,
+      }));
+
       const triggerNode = {
         id: 'trigger-node',
         type: 'triggerNode',
@@ -444,18 +458,45 @@ function FlowEventEditor({ event, onSave, onClose }) {
           label: TRIGGER_NODE.label,
           icon: TRIGGER_NODE.icon,
           color: TRIGGER_NODE.color,
-          outputs: [
-            { id: 'flow', type: 'FLOW', label: 'Flow' },
-            { id: 'user', type: 'USER', label: 'User' },
-            { id: 'channel', type: 'CHANNEL', label: 'Channel' },
-            { id: 'guild', type: 'GUILD', label: 'Guild' },
-          ],
+          outputs: [...baseOutputs, ...optionOutputs],
         },
         draggable: false,
       };
       setNodes([triggerNode, ...nodes]);
     }
   }, []);
+
+  // Update trigger node outputs when command options change
+  useEffect(() => {
+    const triggerNode = nodes.find(n => n.type === 'triggerNode');
+    if (triggerNode) {
+      const baseOutputs = [
+        { id: 'flow', type: 'FLOW', label: 'Flow' },
+        { id: 'user', type: 'USER', label: 'User' },
+        { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+        { id: 'guild', type: 'GUILD', label: 'Guild' },
+      ];
+
+      // Add command options as outputs
+      const optionOutputs = (eventConfig.options || []).map(option => ({
+        id: `option-${option.name}`,
+        type: option.type,
+        label: option.name,
+      }));
+
+      setNodes(nodes.map(node =>
+        node.id === 'trigger-node'
+          ? {
+              ...node,
+              data: {
+                ...node.data,
+                outputs: [...baseOutputs, ...optionOutputs],
+              },
+            }
+          : node
+      ));
+    }
+  }, [eventConfig.options]);
 
   const detectLoops = useCallback((currentEdges) => {
     const adjacency = {};
@@ -707,6 +748,95 @@ function FlowEventEditor({ event, onSave, onClose }) {
                     onChange={(e) => setEventConfig({ ...eventConfig, description: e.target.value })}
                     placeholder="Command description"
                   />
+                </div>
+
+                <div className="form-group">
+                  <label>Command Options</label>
+                  <div className="command-options-list">
+                    {(eventConfig.options || []).map((option, index) => (
+                      <div key={index} className="command-option-item">
+                        <input
+                          type="text"
+                          value={option.name}
+                          onChange={(e) => {
+                            const newOptions = [...(eventConfig.options || [])];
+                            newOptions[index] = { ...option, name: e.target.value };
+                            setEventConfig({ ...eventConfig, options: newOptions });
+                          }}
+                          placeholder="Option name"
+                          style={{ flex: 1, marginRight: '8px' }}
+                        />
+                        <select
+                          value={option.type}
+                          onChange={(e) => {
+                            const newOptions = [...(eventConfig.options || [])];
+                            newOptions[index] = { ...option, type: e.target.value };
+                            setEventConfig({ ...eventConfig, options: newOptions });
+                          }}
+                          style={{ marginRight: '8px' }}
+                        >
+                          <option value="STRING">String</option>
+                          <option value="NUMBER">Number</option>
+                          <option value="BOOLEAN">Boolean</option>
+                          <option value="USER">User</option>
+                          <option value="CHANNEL">Channel</option>
+                          <option value="ROLE">Role</option>
+                        </select>
+                        <label style={{ marginRight: '8px', fontSize: '12px', display: 'flex', alignItems: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={option.required || false}
+                            onChange={(e) => {
+                              const newOptions = [...(eventConfig.options || [])];
+                              newOptions[index] = { ...option, required: e.target.checked };
+                              setEventConfig({ ...eventConfig, options: newOptions });
+                            }}
+                            style={{ marginRight: '4px' }}
+                          />
+                          Required
+                        </label>
+                        <button
+                          onClick={() => {
+                            const newOptions = (eventConfig.options || []).filter((_, i) => i !== index);
+                            setEventConfig({ ...eventConfig, options: newOptions });
+                          }}
+                          style={{
+                            background: '#ed4245',
+                            color: 'white',
+                            border: 'none',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => {
+                        const newOptions = [
+                          ...(eventConfig.options || []),
+                          { name: '', type: 'STRING', required: false, description: '' }
+                        ];
+                        setEventConfig({ ...eventConfig, options: newOptions });
+                      }}
+                      style={{
+                        background: '#5865f2',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        width: '100%',
+                        marginTop: '8px',
+                      }}
+                    >
+                      + Add Option
+                    </button>
+                  </div>
                 </div>
               </>
             )}

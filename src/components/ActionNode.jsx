@@ -64,7 +64,7 @@ const ActionNode = ({ id, data }) => {
       </div>
 
       {isExpanded && (
-        <div className="action-node-config">
+        <div className="action-node-config" onMouseDown={(e) => e.stopPropagation()}>
           {data.actionType === 'send-message' && (
             <>
               <div className="config-field">

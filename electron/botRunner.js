@@ -66,10 +66,38 @@ class BotRunner {
   }
 
   async registerCommands(commandEvents) {
-    const commands = commandEvents.map(cmd => ({
-      name: cmd.name,
-      description: cmd.description || 'No description provided',
-    }));
+    const commands = commandEvents.map(cmd => {
+      const command = {
+        name: cmd.name,
+        description: cmd.description || 'No description provided',
+      };
+
+      // Add command options if they exist
+      if (cmd.options && cmd.options.length > 0) {
+        command.options = cmd.options.map(opt => {
+          const option = {
+            name: opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'), // Discord requires lowercase alphanumeric
+            description: opt.description || `${opt.name} parameter`,
+            required: opt.required || false,
+          };
+
+          // Map our types to Discord's ApplicationCommandOptionType
+          const typeMap = {
+            'STRING': 3,
+            'NUMBER': 10,
+            'BOOLEAN': 5,
+            'USER': 6,
+            'CHANNEL': 7,
+            'ROLE': 8,
+          };
+
+          option.type = typeMap[opt.type] || 3; // Default to STRING
+          return option;
+        });
+      }
+
+      return command;
+    });
 
     // Store commands in the client
     commandEvents.forEach(cmd => {
@@ -159,6 +187,27 @@ class BotRunner {
         member: interaction.member,
       };
 
+      // Add command option values to data context
+      if (command.options && command.options.length > 0) {
+        command.options.forEach(opt => {
+          const optionName = opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+          const value = interaction.options.get(optionName);
+
+          if (value) {
+            // Store the actual value based on type
+            if (opt.type === 'USER') {
+              dataContext[`option-${opt.name}`] = value.user || value.member?.user;
+            } else if (opt.type === 'CHANNEL') {
+              dataContext[`option-${opt.name}`] = value.channel;
+            } else if (opt.type === 'ROLE') {
+              dataContext[`option-${opt.name}`] = value.role;
+            } else {
+              dataContext[`option-${opt.name}`] = value.value;
+            }
+          }
+        });
+      }
+
       // Find trigger node or start nodes
       const triggerNode = flowData.nodes.find(n => n.type === 'triggerNode');
       const startNodes = triggerNode ? [triggerNode] : this.findStartNodes(flowData);
@@ -220,6 +269,11 @@ class BotRunner {
     if (sourceHandle === 'user') return dataContext.user;
     if (sourceHandle === 'channel') return dataContext.channel;
     if (sourceHandle === 'guild') return dataContext.guild;
+
+    // Check for command option values
+    if (sourceHandle.startsWith('option-')) {
+      return dataContext[sourceHandle] || null;
+    }
 
     // Check if value was computed by a data node
     if (dataContext.computed && dataContext.computed[incomingEdge.source]) {
