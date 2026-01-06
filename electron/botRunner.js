@@ -140,49 +140,172 @@ class BotRunner {
   }
 
   async executeCommand(interaction, command) {
-    // Process command actions from the drag-and-drop builder
-    if (!command.actions || command.actions.length === 0) {
+    // Execute graph-based command flow
+    const flowData = command.flowData;
+
+    if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
       await interaction.reply({ content: 'This command has no actions configured.', ephemeral: true });
       return;
     }
 
-    let response = '';
+    try {
+      // Find starting nodes (nodes with no incoming edges)
+      const startNodes = this.findStartNodes(flowData);
 
-    for (const action of command.actions) {
-      switch (action.type) {
-        case 'send-message':
-          response += (action.content || 'Hello!') + '\n';
-          break;
-
-        case 'embed':
-          // For now, simple embed support
-          await interaction.reply({
-            embeds: [{
-              title: action.title || 'Embed',
-              description: action.description || '',
-              color: parseInt(action.color || '0x0099ff'),
-            }]
-          });
-          return;
-
-        case 'add-role':
-          if (action.roleId && interaction.member) {
-            const role = interaction.guild.roles.cache.get(action.roleId);
-            if (role) {
-              await interaction.member.roles.add(role);
-              response += `Added role ${role.name}\n`;
-            }
-          }
-          break;
-
-        default:
-          // Unknown action type
-          break;
+      if (startNodes.length === 0) {
+        await interaction.reply({ content: 'No starting point found in command flow.', ephemeral: true });
+        return;
       }
+
+      // Execute the flow starting from the first start node
+      await this.executeFlow(interaction, flowData, startNodes[0]);
+    } catch (error) {
+      this.log('error', `Command execution error: ${error.message}`);
+      await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
+    }
+  }
+
+  findStartNodes(flowData) {
+    const nodesWithIncoming = new Set();
+    flowData.edges.forEach((edge) => nodesWithIncoming.add(edge.target));
+    return flowData.nodes.filter((node) => !nodesWithIncoming.has(node.id));
+  }
+
+  getNextNodes(flowData, currentNodeId) {
+    const outgoingEdges = flowData.edges.filter((edge) => edge.source === currentNodeId);
+    return outgoingEdges.map((edge) =>
+      flowData.nodes.find((node) => node.id === edge.target)
+    ).filter(Boolean);
+  }
+
+  async executeFlow(interaction, flowData, startNode, visited = new Set()) {
+    if (!startNode || visited.has(startNode.id)) {
+      return; // Prevent infinite loops
     }
 
-    if (response) {
-      await interaction.reply({ content: response.trim() });
+    visited.add(startNode.id);
+
+    // Execute current node
+    const shouldContinue = await this.executeNode(interaction, startNode);
+
+    if (!shouldContinue) {
+      return; // Stop execution if node returns false
+    }
+
+    // Get next nodes
+    const nextNodes = this.getNextNodes(flowData, startNode.id);
+
+    // Execute all next nodes
+    for (const nextNode of nextNodes) {
+      await this.executeFlow(interaction, flowData, nextNode, visited);
+    }
+  }
+
+  async executeNode(interaction, node) {
+    const actionType = node.data.actionType;
+    const config = node.data.config;
+
+    switch (actionType) {
+      case 'send-message':
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: config.content || 'Hello!' });
+        } else {
+          await interaction.followUp({ content: config.content || 'Hello!' });
+        }
+        break;
+
+      case 'embed':
+        const embed = {
+          color: parseInt(config.color?.replace('#', '0x') || '0x5865f2'),
+        };
+
+        if (config.title) embed.title = config.title;
+        if (config.description) embed.description = config.description;
+        if (config.url) embed.url = config.url;
+        if (config.thumbnail) embed.thumbnail = { url: config.thumbnail };
+        if (config.image) embed.image = { url: config.image };
+
+        if (config.author) {
+          embed.author = { name: config.author };
+          if (config.authorIcon) embed.author.iconURL = config.authorIcon;
+          if (config.authorUrl) embed.author.url = config.authorUrl;
+        }
+
+        if (config.footer) {
+          embed.footer = { text: config.footer };
+          if (config.footerIcon) embed.footer.iconURL = config.footerIcon;
+        }
+
+        if (config.fields && config.fields.length > 0) {
+          embed.fields = config.fields;
+        }
+
+        if (config.timestamp) {
+          embed.timestamp = new Date().toISOString();
+        }
+
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await interaction.followUp({ embeds: [embed] });
+        }
+        break;
+
+      case 'add-role':
+        if (config.roleId && interaction.member) {
+          const role = interaction.guild.roles.cache.get(config.roleId);
+          if (role) {
+            await interaction.member.roles.add(role);
+            if (!interaction.replied) {
+              await interaction.reply({ content: `Added role ${role.name}`, ephemeral: true });
+            }
+          }
+        }
+        break;
+
+      case 'remove-role':
+        if (config.roleId && interaction.member) {
+          const role = interaction.guild.roles.cache.get(config.roleId);
+          if (role) {
+            await interaction.member.roles.remove(role);
+            if (!interaction.replied) {
+              await interaction.reply({ content: `Removed role ${role.name}`, ephemeral: true });
+            }
+          }
+        }
+        break;
+
+      case 'condition':
+        // Evaluate condition and return false to stop flow if condition fails
+        return this.evaluateCondition(interaction, config);
+
+      default:
+        break;
+    }
+
+    return true; // Continue to next nodes
+  }
+
+  evaluateCondition(interaction, config) {
+    const condition = config.condition;
+    const value = config.value;
+
+    switch (condition) {
+      case 'has-role':
+        if (value && interaction.member) {
+          return interaction.member.roles.cache.has(value);
+        }
+        return false;
+
+      case 'user-id':
+        return interaction.user.id === value;
+
+      case 'random':
+        const chance = parseInt(value) || 50;
+        return Math.random() * 100 < chance;
+
+      default:
+        return true;
     }
   }
 

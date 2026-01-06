@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import Dashboard from './components/Dashboard';
 import BotEditor from './components/BotEditor';
 import Console from './components/Console';
@@ -146,8 +144,7 @@ function App() {
   const activeBot = bots.find((b) => b.id === activeBotId);
 
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="app">
+    <div className="app">
         {view === 'dashboard' ? (
           <Dashboard
             bots={bots}
@@ -171,7 +168,6 @@ function App() {
 
         <Console logs={logs} onClear={() => setLogs([])} />
       </div>
-    </DndProvider>
   );
 }
 
