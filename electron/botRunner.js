@@ -20,6 +20,56 @@ class BotRunner {
     }
   }
 
+  determineRequiredIntents() {
+    // Base intents always needed
+    const intents = [
+      GatewayIntentBits.Guilds,
+    ];
+
+    // Analyze all events to determine which intents are needed
+    const events = this.config.events || [];
+    const usedNodeTypes = new Set();
+
+    // Collect all node types used across all events
+    events.forEach(event => {
+      if (event.flowData && event.flowData.nodes) {
+        event.flowData.nodes.forEach(node => {
+          if (node.type === 'dataNode' && node.data?.nodeType) {
+            usedNodeTypes.add(node.data.nodeType);
+          } else if (node.data?.actionType) {
+            usedNodeTypes.add(node.data.actionType);
+          }
+        });
+      }
+    });
+
+    // Voice-related nodes need GuildVoiceStates
+    const voiceNodes = ['join-voice', 'leave-voice', 'move-member-voice', 'mute-member-voice', 'deafen-member-voice'];
+    if (voiceNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
+      intents.push(GatewayIntentBits.GuildVoiceStates);
+      this.log('info', 'Voice nodes detected - loading GuildVoiceStates intent');
+    }
+
+    // Message-related nodes need GuildMessages and MessageContent
+    const messageNodes = ['send-message', 'delete-message', 'pin-message', 'create-thread', 'react-emoji'];
+    if (messageNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
+      intents.push(GatewayIntentBits.GuildMessages);
+      intents.push(GatewayIntentBits.MessageContent);
+      this.log('info', 'Message nodes detected - loading GuildMessages and MessageContent intents');
+    }
+
+    // Member-related nodes need GuildMembers
+    const memberNodes = ['timeout-member', 'kick-member', 'ban-member', 'unban-member', 'add-role', 'remove-role',
+                         'get-member-joindate', 'get-member-count', 'check-has-role'];
+    if (memberNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
+      intents.push(GatewayIntentBits.GuildMembers);
+      this.log('info', 'Member nodes detected - loading GuildMembers intent');
+    }
+
+    // Remove duplicates and return
+    return [...new Set(intents)];
+  }
+
   async start() {
     if (this.isRunning) {
       throw new Error('Bot is already running');
@@ -31,14 +81,13 @@ class BotRunner {
 
     this.log('info', 'Starting bot...');
 
-    // Create Discord client with necessary intents
+    // Determine required intents based on nodes used
+    const requiredIntents = this.determineRequiredIntents();
+    this.log('info', `Loading ${requiredIntents.length} intents based on nodes used`);
+
+    // Create Discord client with dynamically determined intents
     this.client = new Client({
-      intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
-      ],
+      intents: requiredIntents,
     });
 
     // Set up commands collection
@@ -311,7 +360,7 @@ class BotRunner {
           }
 
           // Execute the data node
-          const result = this.executeDataNode(sourceNode, flowData, dataContext);
+          const result = await this.executeDataNode(sourceNode, flowData, dataContext);
 
           // Store the result
           if (!dataContext.computed) dataContext.computed = {};
@@ -387,7 +436,7 @@ class BotRunner {
     // Handle data converter nodes
     if (node.type === 'dataNode') {
       this.log('info', `Data node: ${node.data?.nodeType || 'unknown'}`);
-      const result = this.executeDataNode(node, flowData, dataContext);
+      const result = await this.executeDataNode(node, flowData, dataContext);
       this.log('info', `Data node output: ${JSON.stringify(result)}`);
       return result;
     }
@@ -531,6 +580,167 @@ class BotRunner {
         // The branch logic is handled by checking outputs in executeFlow
         break;
 
+      case 'timeout-member':
+        const timeoutUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const duration = this.getInputValue(flowData, node.id, 'duration', dataContext) || config.duration || 60;
+        const timeoutReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
+
+        try {
+          if (timeoutUser && timeoutUser.moderatable) {
+            const durationMs = duration * 1000; // Convert seconds to milliseconds
+            await timeoutUser.timeout(durationMs, timeoutReason);
+            this.log('success', `Timed out ${timeoutUser.user?.tag || 'user'} for ${duration}s`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to timeout member: ${error.message}`);
+        }
+        break;
+
+      case 'kick-member':
+        const kickUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const kickReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
+
+        try {
+          if (kickUser && kickUser.kickable) {
+            await kickUser.kick(kickReason);
+            this.log('success', `Kicked ${kickUser.user?.tag || 'user'}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to kick member: ${error.message}`);
+        }
+        break;
+
+      case 'ban-member':
+        const banUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const banReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
+
+        try {
+          if (banUser && banUser.bannable) {
+            await banUser.ban({ reason: banReason, deleteMessageDays: 0 });
+            this.log('success', `Banned ${banUser.user?.tag || 'user'}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to ban member: ${error.message}`);
+        }
+        break;
+
+      case 'unban-member':
+        const unbanUserId = this.getInputValue(flowData, node.id, 'userId', dataContext) || config.userId || '';
+
+        try {
+          if (unbanUserId && interaction.guild) {
+            await interaction.guild.members.unban(unbanUserId);
+            this.log('success', `Unbanned user ${unbanUserId}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to unban user: ${error.message}`);
+        }
+        break;
+
+      case 'move-member-voice':
+        const moveUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const targetChannel = this.getInputValue(flowData, node.id, 'channel', dataContext);
+
+        try {
+          if (moveUser && targetChannel && moveUser.voice?.channel) {
+            await moveUser.voice.setChannel(targetChannel);
+            this.log('success', `Moved ${moveUser.user?.tag} to ${targetChannel.name}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to move member: ${error.message}`);
+        }
+        break;
+
+      case 'mute-member-voice':
+        const muteUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+
+        try {
+          if (muteUser && muteUser.voice?.channel) {
+            await muteUser.voice.setMute(true);
+            this.log('success', `Voice muted ${muteUser.user?.tag}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to mute member: ${error.message}`);
+        }
+        break;
+
+      case 'deafen-member-voice':
+        const deafenUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+
+        try {
+          if (deafenUser && deafenUser.voice?.channel) {
+            await deafenUser.voice.setDeaf(true);
+            this.log('success', `Voice deafened ${deafenUser.user?.tag}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to deafen member: ${error.message}`);
+        }
+        break;
+
+      case 'delete-message':
+        try {
+          if (interaction.message) {
+            await interaction.message.delete();
+            this.log('success', 'Deleted message');
+          }
+        } catch (error) {
+          this.log('error', `Failed to delete message: ${error.message}`);
+        }
+        break;
+
+      case 'pin-message':
+        try {
+          if (interaction.message) {
+            await interaction.message.pin();
+            this.log('success', 'Pinned message');
+          }
+        } catch (error) {
+          this.log('error', `Failed to pin message: ${error.message}`);
+        }
+        break;
+
+      case 'create-thread':
+        const threadName = this.getInputValue(flowData, node.id, 'name', dataContext) || config.name || 'New Thread';
+
+        try {
+          if (interaction.channel?.threads) {
+            const thread = await interaction.channel.threads.create({
+              name: threadName,
+              autoArchiveDuration: 60,
+              reason: 'Created via bot command',
+            });
+            this.log('success', `Created thread: ${threadName}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to create thread: ${error.message}`);
+        }
+        break;
+
+      case 'join-voice':
+        const voiceChannel = this.getInputValue(flowData, node.id, 'channel', dataContext) || config.channelId;
+
+        try {
+          // Note: Requires @discordjs/voice package for full implementation
+          this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
+          // Basic implementation would be:
+          // const { joinVoiceChannel } = require('@discordjs/voice');
+          // const connection = joinVoiceChannel({ ... });
+        } catch (error) {
+          this.log('error', `Failed to join voice channel: ${error.message}`);
+        }
+        break;
+
+      case 'leave-voice':
+        try {
+          // Note: Requires @discordjs/voice package for full implementation
+          this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
+          // Basic implementation would be:
+          // connection.destroy();
+        } catch (error) {
+          this.log('error', `Failed to leave voice channel: ${error.message}`);
+        }
+        break;
+
       default:
         this.log('warning', `Unknown action type: ${actionType}`);
         break;
@@ -539,7 +749,7 @@ class BotRunner {
     return true; // Continue to next nodes
   }
 
-  executeDataNode(node, flowData, dataContext) {
+  async executeDataNode(node, flowData, dataContext) {
     const nodeType = node.data.nodeType;
 
     if (!nodeType) {
@@ -731,6 +941,45 @@ class BotRunner {
       case 'get-member-count':
         const memberGuild = getUserInput('guild');
         output.count = memberGuild?.memberCount || 0;
+        break;
+
+      // New data nodes - user info
+      case 'get-member-joindate':
+        const joinUser = getUserInput('user');
+        if (joinUser && dataContext.member) {
+          const joinDate = dataContext.member.joinedAt;
+          output.date = joinDate ? joinDate.toISOString() : '';
+        } else {
+          output.date = '';
+        }
+        break;
+
+      case 'get-user-created':
+        const createdUser = getUserInput('user');
+        if (createdUser && createdUser.createdAt) {
+          output.date = createdUser.createdAt.toISOString();
+        } else {
+          output.date = '';
+        }
+        break;
+
+      // Utility nodes
+      case 'wait-delay':
+        const seconds = parseFloat(getUserInput('seconds')) || 0;
+        if (seconds > 0) {
+          await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+        }
+        output.result = seconds;
+        break;
+
+      case 'format-number':
+        const numToFormat = parseFloat(getUserInput('number')) || 0;
+        const decimals = parseInt(getUserInput('decimals')) || 2;
+        output.result = numToFormat.toFixed(decimals);
+        break;
+
+      case 'current-timestamp':
+        output.timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
         break;
 
       default:

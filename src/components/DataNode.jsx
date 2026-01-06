@@ -41,17 +41,35 @@ const DataNode = ({ id, data }) => {
       </div>
 
       {isExpanded && hasConfig && (
-        <div className="data-node-config nodrag" style={{ padding: '10px', background: '#1e1e1e' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="data-node-config nodrag nowheel" style={{ padding: '10px', background: '#1e1e1e' }}>
           {data.nodeType === 'static-boolean' && (
-            <label style={{ display: 'flex', alignItems: 'center', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                handleConfigChange('value', !data.config.value);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                color: '#fff',
+                fontSize: '12px',
+                cursor: 'pointer',
+                userSelect: 'none',
+                padding: '4px'
+              }}
+            >
               <input
                 type="checkbox"
                 checked={data.config.value || false}
-                onChange={(e) => handleConfigChange('value', e.target.checked)}
-                style={{ marginRight: '8px' }}
+                onChange={() => {}} // Controlled by parent div click
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                style={{ marginRight: '8px', pointerEvents: 'none' }}
+                readOnly
               />
-              {data.config.value ? 'True' : 'False'}
-            </label>
+              <span>{data.config.value ? 'True' : 'False'}</span>
+            </div>
           )}
 
           {data.nodeType === 'static-number' && (
