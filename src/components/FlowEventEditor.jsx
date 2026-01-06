@@ -543,6 +543,40 @@ function FlowEventEditor({ event, onSave, onClose }) {
     return false;
   }, []);
 
+  const getHandleType = useCallback((node, handleId) => {
+    // For trigger nodes
+    if (node.type === 'triggerNode' && node.data.outputs) {
+      const output = node.data.outputs.find(o => o.id === handleId);
+      return output?.type || 'FLOW';
+    }
+
+    // For data nodes
+    if (node.type === 'dataNode') {
+      if (node.data.outputs) {
+        const output = node.data.outputs.find(o => o.id === handleId);
+        if (output) return output.type;
+      }
+      if (node.data.inputs) {
+        const input = node.data.inputs.find(i => i.id === handleId);
+        if (input) return input.type;
+      }
+    }
+
+    // For action nodes
+    if (node.type === 'actionNode' && node.data.inputs) {
+      const input = node.data.inputs.find(i => i.id === handleId);
+      if (input) return input.type;
+    }
+
+    // For branch node outputs
+    if (node.data.actionType === 'branch' && node.data.outputs) {
+      const output = node.data.outputs.find(o => o.id === handleId);
+      return output?.type || 'FLOW';
+    }
+
+    return 'FLOW';
+  }, []);
+
   const isValidConnection = useCallback((connection, currentNodes, currentEdges) => {
     const sourceNode = currentNodes.find(n => n.id === connection.source);
     const targetNode = currentNodes.find(n => n.id === connection.target);
@@ -582,40 +616,6 @@ function FlowEventEditor({ event, onSave, onClose }) {
 
     return { valid: true };
   }, [getHandleType]);
-
-  const getHandleType = useCallback((node, handleId) => {
-    // For trigger nodes
-    if (node.type === 'triggerNode' && node.data.outputs) {
-      const output = node.data.outputs.find(o => o.id === handleId);
-      return output?.type || 'FLOW';
-    }
-
-    // For data nodes
-    if (node.type === 'dataNode') {
-      if (node.data.outputs) {
-        const output = node.data.outputs.find(o => o.id === handleId);
-        if (output) return output.type;
-      }
-      if (node.data.inputs) {
-        const input = node.data.inputs.find(i => i.id === handleId);
-        if (input) return input.type;
-      }
-    }
-
-    // For action nodes
-    if (node.type === 'actionNode' && node.data.inputs) {
-      const input = node.data.inputs.find(i => i.id === handleId);
-      if (input) return input.type;
-    }
-
-    // For branch node outputs
-    if (node.data.actionType === 'branch' && node.data.outputs) {
-      const output = node.data.outputs.find(o => o.id === handleId);
-      return output?.type || 'FLOW';
-    }
-
-    return 'FLOW';
-  }, []);
 
   const onConnect = useCallback(
     (params) => {
