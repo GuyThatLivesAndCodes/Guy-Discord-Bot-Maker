@@ -300,6 +300,38 @@ const ActionNode = ({ id, data }) => {
             </div>
           )}
 
+          {data.actionType === 'send-dm' && (
+            <>
+              <div className="config-field">
+                <label>DM Content</label>
+                <textarea
+                  value={data.config.content || ''}
+                  onChange={(e) => handleConfigChange('content', e.target.value)}
+                  placeholder="Type DM message here, or connect a STRING input..."
+                  rows={3}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Connect USER input to send DM to specific user
+                </small>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'react-emoji' && (
+            <div className="config-field">
+              <label>Emoji</label>
+              <input
+                type="text"
+                value={data.config.emoji || ''}
+                onChange={(e) => handleConfigChange('emoji', e.target.value)}
+                placeholder="👍 or emoji ID"
+              />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                💡 Use emoji or custom emoji ID (right-click emoji → Copy ID)
+              </small>
+            </div>
+          )}
+
           {data.actionType === 'branch' && (
             <div className="config-field">
               <p style={{ color: '#b5bac1', fontSize: '12px', margin: 0 }}>

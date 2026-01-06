@@ -165,6 +165,142 @@ const DATA_NODES = [
     ],
     outputs: [{ id: 'result', type: 'BOOLEAN' }],
   },
+  {
+    type: 'string-length',
+    label: 'String Length',
+    icon: '📏',
+    color: '#faa61a',
+    inputs: [{ id: 'string', type: 'STRING' }],
+    outputs: [{ id: 'length', type: 'NUMBER' }],
+  },
+  {
+    type: 'string-contains',
+    label: 'String Contains',
+    icon: '🔍',
+    color: '#ed4245',
+    inputs: [
+      { id: 'string', type: 'STRING' },
+      { id: 'search', type: 'STRING' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'string-lowercase',
+    label: 'To Lowercase',
+    icon: '🔽',
+    color: '#faa61a',
+    inputs: [{ id: 'string', type: 'STRING' }],
+    outputs: [{ id: 'result', type: 'STRING' }],
+  },
+  {
+    type: 'string-uppercase',
+    label: 'To Uppercase',
+    icon: '🔼',
+    color: '#faa61a',
+    inputs: [{ id: 'string', type: 'STRING' }],
+    outputs: [{ id: 'result', type: 'STRING' }],
+  },
+  {
+    type: 'number-greater-than',
+    label: 'Number > (Greater)',
+    icon: '▶️',
+    color: '#ed4245',
+    inputs: [
+      { id: 'a', type: 'NUMBER' },
+      { id: 'b', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'number-less-than',
+    label: 'Number < (Less)',
+    icon: '◀️',
+    color: '#ed4245',
+    inputs: [
+      { id: 'a', type: 'NUMBER' },
+      { id: 'b', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'number-equals',
+    label: 'Number = (Equals)',
+    icon: '🟰',
+    color: '#ed4245',
+    inputs: [
+      { id: 'a', type: 'NUMBER' },
+      { id: 'b', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'compare-strings',
+    label: 'Compare Strings',
+    icon: '📝',
+    color: '#ed4245',
+    inputs: [
+      { id: 'a', type: 'STRING' },
+      { id: 'b', type: 'STRING' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'boolean-not',
+    label: 'NOT (Invert)',
+    icon: '❗',
+    color: '#ed4245',
+    inputs: [{ id: 'value', type: 'BOOLEAN' }],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'boolean-and',
+    label: 'AND',
+    icon: '🔗',
+    color: '#ed4245',
+    inputs: [
+      { id: 'a', type: 'BOOLEAN' },
+      { id: 'b', type: 'BOOLEAN' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'boolean-or',
+    label: 'OR',
+    icon: '🔀',
+    color: '#ed4245',
+    inputs: [
+      { id: 'a', type: 'BOOLEAN' },
+      { id: 'b', type: 'BOOLEAN' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
+  {
+    type: 'random-number',
+    label: 'Random Number',
+    icon: '🎲',
+    color: '#00aff4',
+    inputs: [
+      { id: 'min', type: 'NUMBER' },
+      { id: 'max', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'NUMBER' }],
+  },
+  {
+    type: 'string-to-number',
+    label: 'String → Number',
+    icon: '🔄',
+    color: '#00aff4',
+    inputs: [{ id: 'string', type: 'STRING' }],
+    outputs: [{ id: 'number', type: 'NUMBER' }],
+  },
+  {
+    type: 'get-member-count',
+    label: 'Get Member Count',
+    icon: '👥',
+    color: '#00aff4',
+    inputs: [{ id: 'guild', type: 'GUILD' }],
+    outputs: [{ id: 'count', type: 'NUMBER' }],
+  },
 ];
 
 // Action types available
@@ -224,6 +360,26 @@ const ACTION_TYPES = [
     icon: '👤',
     color: '#ed4245',
     defaultData: { roleId: '' },
+    inputs: [{ id: 'flow', type: 'FLOW' }],
+  },
+  {
+    type: 'send-dm',
+    label: 'Send DM',
+    icon: '✉️',
+    color: '#9b59b6',
+    defaultData: { content: 'Hello!' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'user', type: 'USER', optional: true },
+      { id: 'content', type: 'STRING', optional: true },
+    ],
+  },
+  {
+    type: 'react-emoji',
+    label: 'React with Emoji',
+    icon: '👍',
+    color: '#f39c12',
+    defaultData: { emoji: '👍' },
     inputs: [{ id: 'flow', type: 'FLOW' }],
   },
   {
@@ -342,6 +498,40 @@ function FlowEventEditor({ event, onSave, onClose }) {
     return true;
   }, []);
 
+  const getHandleType = useCallback((node, handleId) => {
+    // For trigger nodes
+    if (node.type === 'triggerNode' && node.data.outputs) {
+      const output = node.data.outputs.find(o => o.id === handleId);
+      return output?.type || 'FLOW';
+    }
+
+    // For data nodes
+    if (node.type === 'dataNode') {
+      if (node.data.outputs) {
+        const output = node.data.outputs.find(o => o.id === handleId);
+        if (output) return output.type;
+      }
+      if (node.data.inputs) {
+        const input = node.data.inputs.find(i => i.id === handleId);
+        if (input) return input.type;
+      }
+    }
+
+    // For action nodes
+    if (node.type === 'actionNode' && node.data.inputs) {
+      const input = node.data.inputs.find(i => i.id === handleId);
+      if (input) return input.type;
+    }
+
+    // For branch node outputs
+    if (node.data.actionType === 'branch' && node.data.outputs) {
+      const output = node.data.outputs.find(o => o.id === handleId);
+      return output?.type || 'FLOW';
+    }
+
+    return 'FLOW';
+  }, []);
+
   const onConnect = useCallback(
     (params) => {
       if (!isValidConnection(params, nodes, edges)) {
@@ -351,16 +541,10 @@ function FlowEventEditor({ event, onSave, onClose }) {
       }
 
       const sourceNode = nodes.find(n => n.id === params.source);
-      const sourceHandle = params.sourceHandle;
 
-      // Get color based on handle type
-      let edgeColor = DATA_TYPES.FLOW.color;
-      if (sourceHandle?.includes('user')) edgeColor = DATA_TYPES.USER.color;
-      else if (sourceHandle?.includes('channel')) edgeColor = DATA_TYPES.CHANNEL.color;
-      else if (sourceHandle?.includes('guild')) edgeColor = DATA_TYPES.GUILD.color;
-      else if (sourceHandle?.includes('name') || sourceHandle?.includes('id') || sourceHandle?.includes('content')) {
-        edgeColor = DATA_TYPES.STRING.color;
-      }
+      // Get the actual type of the source handle
+      const handleType = getHandleType(sourceNode, params.sourceHandle);
+      const edgeColor = DATA_TYPES[handleType]?.color || DATA_TYPES.FLOW.color;
 
       const newEdges = addEdge(
         {
@@ -380,7 +564,7 @@ function FlowEventEditor({ event, onSave, onClose }) {
 
       setEdges(newEdges);
     },
-    [edges, setEdges, detectLoops, nodes, isValidConnection]
+    [edges, setEdges, detectLoops, nodes, isValidConnection, getHandleType]
   );
 
   const onNodeClick = useCallback((event, node) => {

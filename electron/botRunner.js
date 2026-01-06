@@ -230,37 +230,44 @@ class BotRunner {
   }
 
   async executeDependencies(interaction, flowData, nodeId, inputHandle, dataContext) {
-    // Find the edge connected to this input
-    const incomingEdge = flowData.edges.find(
-      e => e.target === nodeId && e.targetHandle === inputHandle
-    );
+    try {
+      // Find the edge connected to this input
+      const incomingEdge = flowData.edges.find(
+        e => e.target === nodeId && e.targetHandle === inputHandle
+      );
 
-    if (!incomingEdge) return;
+      if (!incomingEdge) return;
 
-    const sourceNode = flowData.nodes.find(n => n.id === incomingEdge.source);
-    if (!sourceNode) return;
-
-    // If this is a data node and it hasn't been computed yet, execute it
-    if (sourceNode.type === 'dataNode') {
-      if (!dataContext.computed || !dataContext.computed[sourceNode.id]) {
-        this.log('info', `Executing data dependency: ${sourceNode.id}`);
-
-        // Recursively execute any dependencies this data node has
-        if (sourceNode.data.inputs) {
-          for (const input of sourceNode.data.inputs) {
-            await this.executeDependencies(interaction, flowData, sourceNode.id, input.id, dataContext);
-          }
-        }
-
-        // Execute the data node
-        const result = this.executeDataNode(sourceNode, flowData, dataContext);
-
-        // Store the result
-        if (!dataContext.computed) dataContext.computed = {};
-        dataContext.computed[sourceNode.id] = result;
-
-        this.log('info', `Data dependency result: ${JSON.stringify(result)}`);
+      const sourceNode = flowData.nodes.find(n => n.id === incomingEdge.source);
+      if (!sourceNode) {
+        this.log('warning', `Source node not found for edge to ${nodeId}.${inputHandle}`);
+        return;
       }
+
+      // If this is a data node and it hasn't been computed yet, execute it
+      if (sourceNode.type === 'dataNode') {
+        if (!dataContext.computed || !dataContext.computed[sourceNode.id]) {
+          this.log('info', `Executing data dependency: ${sourceNode.id}`);
+
+          // Recursively execute any dependencies this data node has
+          if (sourceNode.data && sourceNode.data.inputs) {
+            for (const input of sourceNode.data.inputs) {
+              await this.executeDependencies(interaction, flowData, sourceNode.id, input.id, dataContext);
+            }
+          }
+
+          // Execute the data node
+          const result = this.executeDataNode(sourceNode, flowData, dataContext);
+
+          // Store the result
+          if (!dataContext.computed) dataContext.computed = {};
+          dataContext.computed[sourceNode.id] = result;
+
+          this.log('info', `Data dependency result: ${JSON.stringify(result)}`);
+        }
+      }
+    } catch (error) {
+      this.log('error', `Error executing dependency for ${nodeId}.${inputHandle}: ${error.message}`);
     }
   }
 
@@ -434,12 +441,38 @@ class BotRunner {
         }
         break;
 
+      case 'send-dm':
+        const dmUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.user;
+        let dmContent = config.content || 'Hello!';
+        const connectedDmContent = this.getInputValue(flowData, node.id, 'content', dataContext);
+        if (connectedDmContent) {
+          dmContent = connectedDmContent;
+        }
+
+        try {
+          await dmUser.send(dmContent);
+          this.log('success', `Sent DM to ${dmUser.tag}`);
+        } catch (error) {
+          this.log('error', `Failed to send DM: ${error.message}`);
+        }
+        break;
+
+      case 'react-emoji':
+        try {
+          await interaction.react(config.emoji || '👍');
+          this.log('success', `Reacted with ${config.emoji}`);
+        } catch (error) {
+          this.log('error', `Failed to react: ${error.message}`);
+        }
+        break;
+
       case 'branch':
         // Branch node handles conditional flow - handled in executeFlow
         // The branch logic is handled by checking outputs in executeFlow
         break;
 
       default:
+        this.log('warning', `Unknown action type: ${actionType}`);
         break;
     }
 
@@ -449,10 +482,24 @@ class BotRunner {
   executeDataNode(node, flowData, dataContext) {
     const nodeType = node.data.nodeType;
 
-    // Get input values
-    const getUserInput = (inputId) => this.getInputValue(flowData, node.id, inputId, dataContext);
+    if (!nodeType) {
+      this.log('error', `Data node ${node.id} missing nodeType`);
+      return {};
+    }
+
+    // Get input values with error handling
+    const getUserInput = (inputId) => {
+      try {
+        return this.getInputValue(flowData, node.id, inputId, dataContext);
+      } catch (error) {
+        this.log('error', `Error getting input ${inputId} for node ${node.id}: ${error.message}`);
+        return null;
+      }
+    };
 
     const output = {};
+
+    try {
 
     switch (nodeType) {
       case 'get-user-name':
@@ -530,8 +577,97 @@ class BotRunner {
         }
         break;
 
-      default:
+      // String operations
+      case 'string-length':
+        const strForLength = getUserInput('string') || '';
+        output.length = strForLength.length;
         break;
+
+      case 'string-contains':
+        const searchString = getUserInput('string') || '';
+        const searchTerm = getUserInput('search') || '';
+        output.result = searchString.includes(searchTerm);
+        break;
+
+      case 'string-lowercase':
+        const lowerStr = getUserInput('string') || '';
+        output.result = lowerStr.toLowerCase();
+        break;
+
+      case 'string-uppercase':
+        const upperStr = getUserInput('string') || '';
+        output.result = upperStr.toUpperCase();
+        break;
+
+      case 'string-to-number':
+        const numStr = getUserInput('string') || '0';
+        output.number = parseFloat(numStr) || 0;
+        break;
+
+      // Comparison operations
+      case 'number-greater-than':
+        const gtA = parseFloat(getUserInput('a')) || 0;
+        const gtB = parseFloat(getUserInput('b')) || 0;
+        output.result = gtA > gtB;
+        break;
+
+      case 'number-less-than':
+        const ltA = parseFloat(getUserInput('a')) || 0;
+        const ltB = parseFloat(getUserInput('b')) || 0;
+        output.result = ltA < ltB;
+        break;
+
+      case 'number-equals':
+        const eqA = parseFloat(getUserInput('a')) || 0;
+        const eqB = parseFloat(getUserInput('b')) || 0;
+        output.result = eqA === eqB;
+        break;
+
+      case 'compare-strings':
+        const strA = getUserInput('a') || '';
+        const strB = getUserInput('b') || '';
+        output.result = strA === strB;
+        break;
+
+      // Boolean operations
+      case 'boolean-not':
+        const boolValue = getUserInput('value');
+        output.result = !boolValue;
+        break;
+
+      case 'boolean-and':
+        const andA = getUserInput('a');
+        const andB = getUserInput('b');
+        output.result = andA && andB;
+        break;
+
+      case 'boolean-or':
+        const orA = getUserInput('a');
+        const orB = getUserInput('b');
+        output.result = orA || orB;
+        break;
+
+      // Random number
+      case 'random-number':
+        const min = parseFloat(getUserInput('min')) || 0;
+        const max = parseFloat(getUserInput('max')) || 100;
+        output.result = Math.floor(Math.random() * (max - min + 1)) + min;
+        break;
+
+      // Guild operations
+      case 'get-member-count':
+        const memberGuild = getUserInput('guild');
+        output.count = memberGuild?.memberCount || 0;
+        break;
+
+      default:
+        this.log('warning', `Unknown data node type: ${nodeType}`);
+        break;
+    }
+
+    } catch (error) {
+      this.log('error', `Error executing data node ${nodeType}: ${error.message}`);
+      return {};
     }
 
     return output; // Return computed values
