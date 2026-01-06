@@ -74,6 +74,8 @@ const ActionNode = ({ id, data }) => {
                   onChange={(e) => handleConfigChange('content', e.target.value)}
                   placeholder="Type your message here, or connect a STRING input..."
                   rows={3}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
                   💡 Tip: Connect a STRING output to override this text
@@ -110,6 +112,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.title || ''}
                   onChange={(e) => handleConfigChange('title', e.target.value)}
                   placeholder="Embed title"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
                   💡 Connect a STRING to use dynamic data
@@ -123,6 +127,8 @@ const ActionNode = ({ id, data }) => {
                   onChange={(e) => handleConfigChange('description', e.target.value)}
                   placeholder="Main embed text"
                   rows={2}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
                   💡 Supports Discord markdown formatting
@@ -137,11 +143,15 @@ const ActionNode = ({ id, data }) => {
                     value={data.config.color || '#5865f2'}
                     onChange={(e) => handleConfigChange('color', e.target.value)}
                     placeholder="#5865f2"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
                   />
                   <input
                     type="color"
                     value={data.config.color || '#5865f2'}
                     onChange={(e) => handleConfigChange('color', e.target.value)}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
                   />
                 </div>
               </div>
@@ -153,6 +163,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.author || ''}
                   onChange={(e) => handleConfigChange('author', e.target.value)}
                   placeholder="Author name"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -163,6 +175,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.authorIcon || ''}
                   onChange={(e) => handleConfigChange('authorIcon', e.target.value)}
                   placeholder="https://..."
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -173,6 +187,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.authorUrl || ''}
                   onChange={(e) => handleConfigChange('authorUrl', e.target.value)}
                   placeholder="https://..."
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -183,6 +199,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.thumbnail || ''}
                   onChange={(e) => handleConfigChange('thumbnail', e.target.value)}
                   placeholder="https://..."
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -193,6 +211,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.image || ''}
                   onChange={(e) => handleConfigChange('image', e.target.value)}
                   placeholder="https://..."
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -203,6 +223,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.url || ''}
                   onChange={(e) => handleConfigChange('url', e.target.value)}
                   placeholder="https://..."
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -213,6 +235,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.footer || ''}
                   onChange={(e) => handleConfigChange('footer', e.target.value)}
                   placeholder="Footer text"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -223,6 +247,8 @@ const ActionNode = ({ id, data }) => {
                   value={data.config.footerIcon || ''}
                   onChange={(e) => handleConfigChange('footerIcon', e.target.value)}
                   placeholder="https://..."
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
               </div>
 
@@ -275,12 +301,16 @@ const ActionNode = ({ id, data }) => {
                       value={field.name}
                       onChange={(e) => updateEmbedField(index, 'name', e.target.value)}
                       placeholder="Field name"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <input
                       type="text"
                       value={field.value}
                       onChange={(e) => updateEmbedField(index, 'value', e.target.value)}
                       placeholder="Field value"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div
                       className="inline-checkbox"
@@ -320,6 +350,8 @@ const ActionNode = ({ id, data }) => {
                 value={data.config.roleId || ''}
                 onChange={(e) => handleConfigChange('roleId', e.target.value)}
                 placeholder="123456789012345678"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
               />
               <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
                 💡 Right-click role → Copy ID (Developer Mode must be enabled)
@@ -336,6 +368,8 @@ const ActionNode = ({ id, data }) => {
                   onChange={(e) => handleConfigChange('content', e.target.value)}
                   placeholder="Type DM message here, or connect a STRING input..."
                   rows={3}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
                   💡 Connect USER input to send DM to specific user
@@ -352,9 +386,95 @@ const ActionNode = ({ id, data }) => {
                 value={data.config.emoji || ''}
                 onChange={(e) => handleConfigChange('emoji', e.target.value)}
                 placeholder="👍 or emoji ID"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
               />
               <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
                 💡 Use emoji or custom emoji ID (right-click emoji → Copy ID)
+              </small>
+            </div>
+          )}
+
+          {data.actionType === 'timeout-member' && (
+            <>
+              <div className="config-field">
+                <label>Duration (seconds)</label>
+                <input
+                  type="number"
+                  value={data.config.duration || 60}
+                  onChange={(e) => handleConfigChange('duration', parseInt(e.target.value))}
+                  placeholder="60"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  ⏱️ Timeout duration in seconds (max: 2419200 = 28 days)
+                </small>
+              </div>
+              <div className="config-field">
+                <label>Reason (optional)</label>
+                <input
+                  type="text"
+                  value={data.config.reason || ''}
+                  onChange={(e) => handleConfigChange('reason', e.target.value)}
+                  placeholder="Reason for timeout"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Connect USER input to timeout specific user, or uses command user by default
+                </small>
+              </div>
+            </>
+          )}
+
+          {(data.actionType === 'kick-member' || data.actionType === 'ban-member') && (
+            <div className="config-field">
+              <label>Reason (optional)</label>
+              <input
+                type="text"
+                value={data.config.reason || ''}
+                onChange={(e) => handleConfigChange('reason', e.target.value)}
+                placeholder="Reason for action"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                💡 Connect USER input to {data.actionType === 'kick-member' ? 'kick' : 'ban'} specific user
+              </small>
+            </div>
+          )}
+
+          {data.actionType === 'unban-member' && (
+            <div className="config-field">
+              <label>User ID</label>
+              <input
+                type="text"
+                value={data.config.userId || ''}
+                onChange={(e) => handleConfigChange('userId', e.target.value)}
+                placeholder="123456789012345678"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                💡 Enter the Discord user ID to unban
+              </small>
+            </div>
+          )}
+
+          {data.actionType === 'create-thread' && (
+            <div className="config-field">
+              <label>Thread Name</label>
+              <input
+                type="text"
+                value={data.config.name || ''}
+                onChange={(e) => handleConfigChange('name', e.target.value)}
+                placeholder="New Thread"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                💡 Connect STRING input to set thread name dynamically
               </small>
             </div>
           )}
@@ -373,7 +493,7 @@ const ActionNode = ({ id, data }) => {
 
       {/* Output handles - single or multiple based on action type */}
       {data.outputs && data.outputs.length > 0 ? (
-        // Multiple outputs (like Branch node)
+        // Multiple outputs (like Branch node or error handling)
         <div className="action-node-outputs">
           {data.outputs.map((output, index) => (
             <Handle
@@ -382,7 +502,11 @@ const ActionNode = ({ id, data }) => {
               position={Position.Right}
               id={output.id}
               style={{
-                background: output.id === 'true' ? '#57f287' : output.id === 'false' ? '#ed4245' : DATA_TYPES.FLOW.color,
+                background:
+                  output.id === 'true' ? '#57f287' :
+                  output.id === 'false' ? '#ed4245' :
+                  output.id === 'fail' ? '#ed4245' :
+                  DATA_TYPES.FLOW.color,
                 width: 12,
                 height: 12,
                 right: '-6px',

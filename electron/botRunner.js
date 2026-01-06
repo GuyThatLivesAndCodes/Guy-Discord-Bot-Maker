@@ -388,8 +388,8 @@ class BotRunner {
       return; // Stop execution if node returns false
     }
 
-    // Store computed data from this node
-    if (nodeOutput && typeof nodeOutput === 'object') {
+    // Store computed data from this node (if it's an object and not a result object)
+    if (nodeOutput && typeof nodeOutput === 'object' && !nodeOutput.hasOwnProperty('success')) {
       if (!dataContext.computed) dataContext.computed = {};
       dataContext.computed[startNode.id] = nodeOutput;
     }
@@ -414,8 +414,22 @@ class BotRunner {
         await this.executeFlow(interaction, flowData, node, dataContext, visited);
       }
     } else {
-      // Get next nodes connected via flow output
-      const nextConnections = this.getConnectedNodes(flowData, startNode.id, 'flow');
+      // Determine which output to follow (success or fail)
+      let outputHandle = 'flow';
+
+      // If node returned execution result with success flag
+      if (nodeOutput && typeof nodeOutput === 'object' && nodeOutput.hasOwnProperty('success')) {
+        outputHandle = nodeOutput.success ? 'flow' : 'fail';
+
+        // Store any returned data
+        if (nodeOutput.data) {
+          if (!dataContext.computed) dataContext.computed = {};
+          dataContext.computed[startNode.id] = nodeOutput.data;
+        }
+      }
+
+      // Get next nodes connected via the determined output
+      const nextConnections = this.getConnectedNodes(flowData, startNode.id, outputHandle);
 
       // Execute all next nodes
       for (const { node } of nextConnections) {
@@ -455,6 +469,9 @@ class BotRunner {
     const actionType = node.data.actionType;
     const config = node.data.config;
     this.log('info', `Action node: ${actionType}`);
+
+    // Wrap all actions in try-catch for error handling
+    try {
 
     switch (actionType) {
       case 'send-message':
@@ -746,7 +763,14 @@ class BotRunner {
         break;
     }
 
-    return true; // Continue to next nodes
+    // Action executed successfully
+    return { success: true };
+
+    } catch (error) {
+      // Action failed - log error and return failure status
+      this.log('error', `Action ${actionType} failed: ${error.message}`);
+      return { success: false };
+    }
   }
 
   async executeDataNode(node, flowData, dataContext) {

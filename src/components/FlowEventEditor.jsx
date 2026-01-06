@@ -373,8 +373,14 @@ const DATA_NODES = [
     label: 'Wait / Delay',
     icon: '⏳',
     color: '#00aff4',
-    inputs: [{ id: 'seconds', type: 'NUMBER' }],
-    outputs: [{ id: 'result', type: 'NUMBER' }],
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'seconds', type: 'NUMBER', optional: true }
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'result', type: 'NUMBER' }
+    ],
     tags: ['wait', 'delay', 'pause', 'sleep', 'timeout', 'timer'],
   },
   {
@@ -412,6 +418,10 @@ const ACTION_TYPES = [
       { id: 'flow', type: 'FLOW' },
       { id: 'content', type: 'STRING', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk'],
   },
   {
@@ -443,6 +453,10 @@ const ACTION_TYPES = [
       { id: 'thumbnail', type: 'STRING', optional: true },
       { id: 'image', type: 'STRING', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['embed', 'message', 'rich', 'fancy', 'formatted', 'card'],
   },
   {
@@ -452,6 +466,10 @@ const ACTION_TYPES = [
     color: '#faa81a',
     defaultData: { roleId: '' },
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['role', 'add', 'give', 'assign', 'permission', 'member'],
   },
   {
@@ -461,6 +479,10 @@ const ACTION_TYPES = [
     color: '#ed4245',
     defaultData: { roleId: '' },
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['role', 'remove', 'take', 'revoke', 'permission', 'member'],
   },
   {
@@ -474,6 +496,10 @@ const ACTION_TYPES = [
       { id: 'user', type: 'USER', optional: true },
       { id: 'content', type: 'STRING', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['dm', 'direct', 'message', 'private', 'send', 'whisper', 'pm'],
   },
   {
@@ -483,6 +509,10 @@ const ACTION_TYPES = [
     color: '#f39c12',
     defaultData: { emoji: '👍' },
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['react', 'reaction', 'emoji', 'emoticon', 'response'],
   },
   // Moderation Actions
@@ -491,12 +521,16 @@ const ACTION_TYPES = [
     label: 'Timeout Member',
     icon: '⏱️',
     color: '#ed4245',
-    defaultData: { duration: 60 },
+    defaultData: { duration: 60, reason: '' },
     inputs: [
       { id: 'flow', type: 'FLOW' },
       { id: 'user', type: 'USER', optional: true },
       { id: 'duration', type: 'NUMBER', optional: true },
       { id: 'reason', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['timeout', 'mute', 'punish', 'moderate', 'discipline', 'silence', 'ban', 'temp'],
   },
@@ -511,6 +545,10 @@ const ACTION_TYPES = [
       { id: 'user', type: 'USER', optional: true },
       { id: 'reason', type: 'STRING', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['kick', 'remove', 'punish', 'moderate', 'eject', 'boot'],
   },
   {
@@ -524,6 +562,10 @@ const ACTION_TYPES = [
       { id: 'user', type: 'USER', optional: true },
       { id: 'reason', type: 'STRING', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['ban', 'punish', 'moderate', 'permanent', 'remove', 'hammer'],
   },
   {
@@ -535,6 +577,10 @@ const ACTION_TYPES = [
     inputs: [
       { id: 'flow', type: 'FLOW' },
       { id: 'userId', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['unban', 'pardon', 'forgive', 'unblock', 'restore'],
   },
@@ -549,6 +595,10 @@ const ACTION_TYPES = [
       { id: 'flow', type: 'FLOW' },
       { id: 'channel', type: 'CHANNEL', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['voice', 'vc', 'join', 'connect', 'audio', 'call'],
   },
   {
@@ -558,6 +608,10 @@ const ACTION_TYPES = [
     color: '#9b59b6',
     defaultData: {},
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['voice', 'vc', 'leave', 'disconnect', 'exit', 'audio'],
   },
   {
@@ -571,6 +625,10 @@ const ACTION_TYPES = [
       { id: 'user', type: 'USER', optional: true },
       { id: 'channel', type: 'CHANNEL', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['voice', 'vc', 'move', 'transfer', 'relocate', 'channel'],
   },
   {
@@ -582,6 +640,10 @@ const ACTION_TYPES = [
     inputs: [
       { id: 'flow', type: 'FLOW' },
       { id: 'user', type: 'USER', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['voice', 'vc', 'mute', 'silence', 'audio', 'moderate'],
   },
@@ -595,6 +657,10 @@ const ACTION_TYPES = [
       { id: 'flow', type: 'FLOW' },
       { id: 'user', type: 'USER', optional: true },
     ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['voice', 'vc', 'deafen', 'deaf', 'audio', 'moderate'],
   },
   // Message/Channel Actions
@@ -605,6 +671,10 @@ const ACTION_TYPES = [
     color: '#ed4245',
     defaultData: {},
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['delete', 'remove', 'message', 'clear', 'erase'],
   },
   {
@@ -614,6 +684,10 @@ const ACTION_TYPES = [
     color: '#faa81a',
     defaultData: {},
     inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
     tags: ['pin', 'stick', 'important', 'message', 'highlight'],
   },
   {
@@ -625,6 +699,10 @@ const ACTION_TYPES = [
     inputs: [
       { id: 'flow', type: 'FLOW' },
       { id: 'name', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['thread', 'create', 'conversation', 'discussion', 'forum'],
   },
