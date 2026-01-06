@@ -80,13 +80,24 @@ const ActionNode = ({ id, data }) => {
                 </small>
               </div>
               <div className="config-field">
-                <label>
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
                   <input
                     type="checkbox"
                     checked={data.config.ephemeral || false}
-                    onChange={(e) => handleConfigChange('ephemeral', e.target.checked)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleConfigChange('ephemeral', e.target.checked);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ cursor: 'pointer' }}
                   />
-                  Private Message (only visible to command user)
+                  <span style={{ marginLeft: '8px', userSelect: 'none' }}>
+                    Private Message (only visible to command user)
+                  </span>
                 </label>
               </div>
             </>
@@ -218,24 +229,46 @@ const ActionNode = ({ id, data }) => {
               </div>
 
               <div className="config-field">
-                <label>
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
                   <input
                     type="checkbox"
                     checked={data.config.timestamp || false}
-                    onChange={(e) => handleConfigChange('timestamp', e.target.checked)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleConfigChange('timestamp', e.target.checked);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ cursor: 'pointer' }}
                   />
-                  Show Timestamp
+                  <span style={{ marginLeft: '8px', userSelect: 'none' }}>
+                    Show Timestamp
+                  </span>
                 </label>
               </div>
 
               <div className="config-field">
-                <label>
+                <label
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                >
                   <input
                     type="checkbox"
                     checked={data.config.ephemeral || false}
-                    onChange={(e) => handleConfigChange('ephemeral', e.target.checked)}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      handleConfigChange('ephemeral', e.target.checked);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ cursor: 'pointer' }}
                   />
-                  Private Message (only visible to command user)
+                  <span style={{ marginLeft: '8px', userSelect: 'none' }}>
+                    Private Message (only visible to command user)
+                  </span>
                 </label>
               </div>
 
@@ -255,11 +288,21 @@ const ActionNode = ({ id, data }) => {
                       onChange={(e) => updateEmbedField(index, 'value', e.target.value)}
                       placeholder="Field value"
                     />
-                    <label className="inline-checkbox">
+                    <label
+                      className="inline-checkbox"
+                      onClick={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      style={{ cursor: 'pointer' }}
+                    >
                       <input
                         type="checkbox"
                         checked={field.inline || false}
-                        onChange={(e) => updateEmbedField(index, 'inline', e.target.checked)}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          updateEmbedField(index, 'inline', e.target.checked);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ cursor: 'pointer' }}
                       />
                       Inline
                     </label>

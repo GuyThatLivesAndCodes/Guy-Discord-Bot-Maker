@@ -484,19 +484,27 @@ function FlowEventEditor({ event, onSave, onClose }) {
         label: option.name,
       }));
 
-      setNodes(nodes.map(node =>
-        node.id === 'trigger-node'
-          ? {
-              ...node,
-              data: {
-                ...node.data,
-                outputs: [...baseOutputs, ...optionOutputs],
-              },
-            }
-          : node
-      ));
+      const newOutputs = [...baseOutputs, ...optionOutputs];
+
+      // Only update if outputs actually changed
+      const currentOutputs = triggerNode.data.outputs || [];
+      const outputsChanged = JSON.stringify(currentOutputs) !== JSON.stringify(newOutputs);
+
+      if (outputsChanged) {
+        setNodes(nodes.map(node =>
+          node.id === 'trigger-node'
+            ? {
+                ...node,
+                data: {
+                  ...node.data,
+                  outputs: newOutputs,
+                },
+              }
+            : node
+        ));
+      }
     }
-  }, [eventConfig.options]);
+  }, [eventConfig.options, nodes, setNodes]);
 
   const detectLoops = useCallback((currentEdges) => {
     const adjacency = {};
@@ -535,28 +543,45 @@ function FlowEventEditor({ event, onSave, onClose }) {
     return false;
   }, []);
 
-  const isValidConnection = useCallback((connection, nodes, edges) => {
-    const sourceNode = nodes.find(n => n.id === connection.source);
-    const targetNode = nodes.find(n => n.id === connection.target);
+  const isValidConnection = useCallback((connection, currentNodes, currentEdges) => {
+    const sourceNode = currentNodes.find(n => n.id === connection.source);
+    const targetNode = currentNodes.find(n => n.id === connection.target);
 
-    if (!sourceNode || !targetNode) return false;
+    if (!sourceNode || !targetNode) {
+      return { valid: false, reason: 'Invalid source or target node' };
+    }
+
+    // Get source and target handle types
+    const sourceType = getHandleType(sourceNode, connection.sourceHandle);
+    const targetType = getHandleType(targetNode, connection.targetHandle);
+
+    // Validate type compatibility (FLOW can connect to FLOW, types must match for data connections)
+    if (sourceType !== targetType) {
+      return {
+        valid: false,
+        reason: `❌ Type mismatch! Cannot connect ${sourceType} to ${targetType}`
+      };
+    }
 
     const targetHandle = connection.targetHandle;
 
     // Check if this is a non-FLOW input
-    if (targetHandle && targetHandle !== 'flow') {
+    if (targetHandle && targetType !== 'FLOW') {
       // Check if there's already a connection to this target handle
-      const existingConnection = edges.find(
+      const existingConnection = currentEdges.find(
         e => e.target === connection.target && e.targetHandle === targetHandle
       );
 
       if (existingConnection) {
-        return false; // Prevent multiple connections to non-FLOW inputs
+        return {
+          valid: false,
+          reason: '❌ Already connected! Data inputs can only have one connection.'
+        };
       }
     }
 
-    return true;
-  }, []);
+    return { valid: true };
+  }, [getHandleType]);
 
   const getHandleType = useCallback((node, handleId) => {
     // For trigger nodes
@@ -594,8 +619,10 @@ function FlowEventEditor({ event, onSave, onClose }) {
 
   const onConnect = useCallback(
     (params) => {
-      if (!isValidConnection(params, nodes, edges)) {
-        setLoopWarning('❌ Invalid connection! Non-FLOW inputs can only have one connection.');
+      const validation = isValidConnection(params, nodes, edges);
+
+      if (!validation.valid) {
+        setLoopWarning(validation.reason || '❌ Invalid connection!');
         setTimeout(() => setLoopWarning(null), 3000);
         return;
       }
