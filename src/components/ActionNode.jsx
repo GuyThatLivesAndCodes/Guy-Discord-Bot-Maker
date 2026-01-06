@@ -10,6 +10,7 @@ const DATA_TYPES = {
   GUILD: { color: '#7289da', label: 'Guild' },
   STRING: { color: '#faa61a', label: 'String' },
   NUMBER: { color: '#00aff4', label: 'Number' },
+  BOOLEAN: { color: '#ed4245', label: 'Boolean' },
 };
 
 const ActionNode = ({ id, data }) => {
@@ -75,18 +76,30 @@ const ActionNode = ({ id, data }) => {
       {isExpanded && (
         <div className="action-node-config">
           {data.actionType === 'send-message' && (
-            <div className="config-field">
-              <label>Message Content</label>
-              <textarea
-                value={data.config.content || ''}
-                onChange={(e) => handleConfigChange('content', e.target.value)}
-                placeholder="Type your message here, or connect a STRING input..."
-                rows={3}
-              />
-              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                💡 Tip: Connect a STRING output to override this text
-              </small>
-            </div>
+            <>
+              <div className="config-field">
+                <label>Message Content</label>
+                <textarea
+                  value={data.config.content || ''}
+                  onChange={(e) => handleConfigChange('content', e.target.value)}
+                  placeholder="Type your message here, or connect a STRING input..."
+                  rows={3}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Tip: Connect a STRING output to override this text
+                </small>
+              </div>
+              <div className="config-field">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={data.config.ephemeral || false}
+                    onChange={(e) => handleConfigChange('ephemeral', e.target.checked)}
+                  />
+                  Private Message (only visible to command user)
+                </label>
+              </div>
+            </>
           )}
 
           {data.actionType === 'embed' && (
@@ -225,6 +238,17 @@ const ActionNode = ({ id, data }) => {
                 </label>
               </div>
 
+              <div className="config-field">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={data.config.ephemeral || false}
+                    onChange={(e) => handleConfigChange('ephemeral', e.target.checked)}
+                  />
+                  Private Message (only visible to command user)
+                </label>
+              </div>
+
               <div className="config-field embed-fields-section">
                 <label>Fields</label>
                 {(data.config.fields || []).map((field, index) => (
@@ -276,47 +300,55 @@ const ActionNode = ({ id, data }) => {
             </div>
           )}
 
-          {data.actionType === 'condition' && (
-            <>
-              <div className="config-field">
-                <label>Condition Type</label>
-                <select
-                  value={data.config.condition || 'has-role'}
-                  onChange={(e) => handleConfigChange('condition', e.target.value)}
-                >
-                  <option value="has-role">Has Role</option>
-                  <option value="user-id">User ID Equals</option>
-                  <option value="random">Random Chance</option>
-                </select>
-              </div>
-
-              <div className="config-field">
-                <label>Value</label>
-                <input
-                  type="text"
-                  value={data.config.value || ''}
-                  onChange={(e) => handleConfigChange('value', e.target.value)}
-                  placeholder="Role ID, User ID, or %"
-                />
-              </div>
-            </>
+          {data.actionType === 'branch' && (
+            <div className="config-field">
+              <p style={{ color: '#b5bac1', fontSize: '12px', margin: 0 }}>
+                💡 Connect a BOOLEAN input to the "condition" handle. The flow will split:
+                <br/>• <strong style={{color: '#57f287'}}>True output</strong> executes if condition is true
+                <br/>• <strong style={{color: '#ed4245'}}>False output</strong> executes if condition is false
+              </p>
+            </div>
           )}
         </div>
       )}
 
-      {/* Output handle for flow continuation */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="flow"
-        style={{
-          background: DATA_TYPES.FLOW.color,
-          width: 12,
-          height: 12,
-          right: '-6px',
-          border: '2px solid #2b2d31',
-        }}
-      />
+      {/* Output handles - single or multiple based on action type */}
+      {data.outputs && data.outputs.length > 0 ? (
+        // Multiple outputs (like Branch node)
+        <div className="action-node-outputs">
+          {data.outputs.map((output, index) => (
+            <Handle
+              key={output.id}
+              type="source"
+              position={Position.Right}
+              id={output.id}
+              style={{
+                background: output.id === 'true' ? '#57f287' : output.id === 'false' ? '#ed4245' : DATA_TYPES.FLOW.color,
+                width: 12,
+                height: 12,
+                right: '-6px',
+                top: `${50 + index * 20}%`,
+                border: '2px solid #2b2d31',
+              }}
+              title={output.label || output.id}
+            />
+          ))}
+        </div>
+      ) : (
+        // Single output (default)
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="flow"
+          style={{
+            background: DATA_TYPES.FLOW.color,
+            width: 12,
+            height: 12,
+            right: '-6px',
+            border: '2px solid #2b2d31',
+          }}
+        />
+      )}
     </div>
   );
 };

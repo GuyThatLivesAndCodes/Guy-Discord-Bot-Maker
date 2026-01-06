@@ -29,6 +29,7 @@ export const DATA_TYPES = {
   GUILD: { color: '#7289da', label: 'Guild' },
   STRING: { color: '#faa61a', label: 'String' },
   NUMBER: { color: '#00aff4', label: 'Number' },
+  BOOLEAN: { color: '#ed4245', label: 'Boolean' },
 };
 
 // Trigger node (auto-added for commands)
@@ -89,6 +90,81 @@ const DATA_NODES = [
     inputs: [{ id: 'guild', type: 'GUILD' }],
     outputs: [{ id: 'name', type: 'STRING' }],
   },
+  // Utility nodes
+  {
+    type: 'join-strings',
+    label: 'Join Strings',
+    icon: '🔗',
+    color: '#faa61a',
+    inputs: [
+      { id: 'string1', type: 'STRING' },
+      { id: 'string2', type: 'STRING' },
+    ],
+    outputs: [{ id: 'result', type: 'STRING' }],
+  },
+  {
+    type: 'number-to-string',
+    label: 'Number → String',
+    icon: '🔄',
+    color: '#00aff4',
+    inputs: [{ id: 'number', type: 'NUMBER' }],
+    outputs: [{ id: 'string', type: 'STRING' }],
+  },
+  {
+    type: 'add-numbers',
+    label: 'Add Numbers',
+    icon: '➕',
+    color: '#00aff4',
+    inputs: [
+      { id: 'a', type: 'NUMBER' },
+      { id: 'b', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'NUMBER' }],
+  },
+  {
+    type: 'subtract-numbers',
+    label: 'Subtract Numbers',
+    icon: '➖',
+    color: '#00aff4',
+    inputs: [
+      { id: 'a', type: 'NUMBER' },
+      { id: 'b', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'NUMBER' }],
+  },
+  {
+    type: 'multiply-numbers',
+    label: 'Multiply Numbers',
+    icon: '✖️',
+    color: '#00aff4',
+    inputs: [
+      { id: 'a', type: 'NUMBER' },
+      { id: 'b', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'NUMBER' }],
+  },
+  {
+    type: 'divide-numbers',
+    label: 'Divide Numbers',
+    icon: '➗',
+    color: '#00aff4',
+    inputs: [
+      { id: 'a', type: 'NUMBER' },
+      { id: 'b', type: 'NUMBER' },
+    ],
+    outputs: [{ id: 'result', type: 'NUMBER' }],
+  },
+  {
+    type: 'check-has-role',
+    label: 'Check Has Role',
+    icon: '✅',
+    color: '#ed4245',
+    inputs: [
+      { id: 'user', type: 'USER' },
+      { id: 'roleId', type: 'STRING' },
+    ],
+    outputs: [{ id: 'result', type: 'BOOLEAN' }],
+  },
 ];
 
 // Action types available
@@ -98,7 +174,7 @@ const ACTION_TYPES = [
     label: 'Send Message',
     icon: '💬',
     color: '#5865f2',
-    defaultData: { content: 'Hello, World!' },
+    defaultData: { content: 'Hello, World!', ephemeral: false },
     inputs: [
       { id: 'flow', type: 'FLOW' },
       { id: 'content', type: 'STRING', optional: true },
@@ -123,6 +199,7 @@ const ACTION_TYPES = [
       authorUrl: '',
       url: '',
       timestamp: false,
+      ephemeral: false,
     },
     inputs: [
       { id: 'flow', type: 'FLOW' },
@@ -150,12 +227,19 @@ const ACTION_TYPES = [
     inputs: [{ id: 'flow', type: 'FLOW' }],
   },
   {
-    type: 'condition',
-    label: 'Condition',
+    type: 'branch',
+    label: 'Branch',
     icon: '🔀',
     color: '#00aff4',
-    defaultData: { condition: 'has-role', value: '' },
-    inputs: [{ id: 'flow', type: 'FLOW' }],
+    defaultData: {},
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'condition', type: 'BOOLEAN' },
+    ],
+    outputs: [
+      { id: 'true', type: 'FLOW', label: 'True' },
+      { id: 'false', type: 'FLOW', label: 'False' },
+    ],
   },
 ];
 
@@ -241,18 +325,27 @@ function FlowEventEditor({ event, onSave, onClose }) {
 
     if (!sourceNode || !targetNode) return false;
 
-    // Get output type from source handle
-    const sourceHandle = connection.sourceHandle;
     const targetHandle = connection.targetHandle;
 
-    // For now, allow all connections (we'll validate types in execution)
+    // Check if this is a non-FLOW input
+    if (targetHandle && targetHandle !== 'flow') {
+      // Check if there's already a connection to this target handle
+      const existingConnection = edges.find(
+        e => e.target === connection.target && e.targetHandle === targetHandle
+      );
+
+      if (existingConnection) {
+        return false; // Prevent multiple connections to non-FLOW inputs
+      }
+    }
+
     return true;
   }, []);
 
   const onConnect = useCallback(
     (params) => {
       if (!isValidConnection(params, nodes, edges)) {
-        setLoopWarning('❌ Invalid connection! Data types don\'t match.');
+        setLoopWarning('❌ Invalid connection! Non-FLOW inputs can only have one connection.');
         setTimeout(() => setLoopWarning(null), 3000);
         return;
       }

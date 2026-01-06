@@ -284,12 +284,27 @@ class BotRunner {
       dataContext.computed[startNode.id] = nodeOutput;
     }
 
-    // Get next nodes connected via flow output
-    const nextConnections = this.getConnectedNodes(flowData, startNode.id, 'flow');
+    // Handle branch nodes with conditional flow
+    if (startNode.data.actionType === 'branch') {
+      // Get the condition value
+      const conditionValue = this.getInputValue(flowData, startNode.id, 'condition', dataContext);
+      const outputHandle = conditionValue ? 'true' : 'false';
 
-    // Execute all next nodes
-    for (const { node } of nextConnections) {
-      await this.executeFlow(interaction, flowData, node, dataContext, visited);
+      this.log('info', `Branch node condition: ${conditionValue}, following ${outputHandle} path`);
+
+      // Follow the appropriate output path
+      const nextConnections = this.getConnectedNodes(flowData, startNode.id, outputHandle);
+      for (const { node } of nextConnections) {
+        await this.executeFlow(interaction, flowData, node, dataContext, visited);
+      }
+    } else {
+      // Get next nodes connected via flow output
+      const nextConnections = this.getConnectedNodes(flowData, startNode.id, 'flow');
+
+      // Execute all next nodes
+      for (const { node } of nextConnections) {
+        await this.executeFlow(interaction, flowData, node, dataContext, visited);
+      }
     }
   }
 
@@ -334,10 +349,15 @@ class BotRunner {
           messageContent = connectedContent;
         }
 
+        const messageOptions = {
+          content: messageContent,
+          ephemeral: config.ephemeral || false
+        };
+
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: messageContent });
+          await interaction.reply(messageOptions);
         } else {
-          await interaction.followUp({ content: messageContent });
+          await interaction.followUp(messageOptions);
         }
         break;
 
@@ -378,10 +398,15 @@ class BotRunner {
           embed.timestamp = new Date().toISOString();
         }
 
+        const embedOptions = {
+          embeds: [embed],
+          ephemeral: config.ephemeral || false
+        };
+
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ embeds: [embed] });
+          await interaction.reply(embedOptions);
         } else {
-          await interaction.followUp({ embeds: [embed] });
+          await interaction.followUp(embedOptions);
         }
         break;
 
@@ -409,9 +434,10 @@ class BotRunner {
         }
         break;
 
-      case 'condition':
-        // Evaluate condition and return false to stop flow if condition fails
-        return this.evaluateCondition(interaction, config);
+      case 'branch':
+        // Branch node handles conditional flow - handled in executeFlow
+        // The branch logic is handled by checking outputs in executeFlow
+        break;
 
       default:
         break;
@@ -459,34 +485,56 @@ class BotRunner {
         output.name = guild?.name || 'Unknown';
         break;
 
+      // Utility nodes
+      case 'join-strings':
+        const string1 = getUserInput('string1') || '';
+        const string2 = getUserInput('string2') || '';
+        output.result = string1 + string2;
+        break;
+
+      case 'number-to-string':
+        const number = getUserInput('number');
+        output.string = number !== null && number !== undefined ? String(number) : '';
+        break;
+
+      case 'add-numbers':
+        const addA = parseFloat(getUserInput('a')) || 0;
+        const addB = parseFloat(getUserInput('b')) || 0;
+        output.result = addA + addB;
+        break;
+
+      case 'subtract-numbers':
+        const subA = parseFloat(getUserInput('a')) || 0;
+        const subB = parseFloat(getUserInput('b')) || 0;
+        output.result = subA - subB;
+        break;
+
+      case 'multiply-numbers':
+        const mulA = parseFloat(getUserInput('a')) || 0;
+        const mulB = parseFloat(getUserInput('b')) || 0;
+        output.result = mulA * mulB;
+        break;
+
+      case 'divide-numbers':
+        const divA = parseFloat(getUserInput('a')) || 0;
+        const divB = parseFloat(getUserInput('b')) || 1; // Avoid division by zero
+        output.result = divB !== 0 ? divA / divB : 0;
+        break;
+
+      case 'check-has-role':
+        const checkUser = getUserInput('user');
+        const roleId = getUserInput('roleId');
+        output.result = false;
+        if (checkUser && roleId && dataContext.member) {
+          output.result = dataContext.member.roles.cache.has(roleId);
+        }
+        break;
+
       default:
         break;
     }
 
     return output; // Return computed values
-  }
-
-  evaluateCondition(interaction, config) {
-    const condition = config.condition;
-    const value = config.value;
-
-    switch (condition) {
-      case 'has-role':
-        if (value && interaction.member) {
-          return interaction.member.roles.cache.has(value);
-        }
-        return false;
-
-      case 'user-id':
-        return interaction.user.id === value;
-
-      case 'random':
-        const chance = parseInt(value) || 50;
-        return Math.random() * 100 < chance;
-
-      default:
-        return true;
-    }
   }
 
   stop() {

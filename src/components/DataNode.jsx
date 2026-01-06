@@ -1,7 +1,17 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
-import { DATA_TYPES } from './FlowEventEditor';
 import './DataNode.css';
+
+// Data types - duplicated to avoid circular dependency
+const DATA_TYPES = {
+  FLOW: { color: '#5865f2', label: 'Flow' },
+  USER: { color: '#f23f43', label: 'User' },
+  CHANNEL: { color: '#43b581', label: 'Channel' },
+  GUILD: { color: '#7289da', label: 'Guild' },
+  STRING: { color: '#faa61a', label: 'String' },
+  NUMBER: { color: '#00aff4', label: 'Number' },
+  BOOLEAN: { color: '#ed4245', label: 'Boolean' },
+};
 
 const DataNode = ({ id, data }) => {
   return (
