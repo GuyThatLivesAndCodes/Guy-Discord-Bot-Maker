@@ -229,6 +229,41 @@ class BotRunner {
     return null;
   }
 
+  async executeDependencies(interaction, flowData, nodeId, inputHandle, dataContext) {
+    // Find the edge connected to this input
+    const incomingEdge = flowData.edges.find(
+      e => e.target === nodeId && e.targetHandle === inputHandle
+    );
+
+    if (!incomingEdge) return;
+
+    const sourceNode = flowData.nodes.find(n => n.id === incomingEdge.source);
+    if (!sourceNode) return;
+
+    // If this is a data node and it hasn't been computed yet, execute it
+    if (sourceNode.type === 'dataNode') {
+      if (!dataContext.computed || !dataContext.computed[sourceNode.id]) {
+        this.log('info', `Executing data dependency: ${sourceNode.id}`);
+
+        // Recursively execute any dependencies this data node has
+        if (sourceNode.data.inputs) {
+          for (const input of sourceNode.data.inputs) {
+            await this.executeDependencies(interaction, flowData, sourceNode.id, input.id, dataContext);
+          }
+        }
+
+        // Execute the data node
+        const result = this.executeDataNode(sourceNode, flowData, dataContext);
+
+        // Store the result
+        if (!dataContext.computed) dataContext.computed = {};
+        dataContext.computed[sourceNode.id] = result;
+
+        this.log('info', `Data dependency result: ${JSON.stringify(result)}`);
+      }
+    }
+  }
+
   async executeFlow(interaction, flowData, startNode, dataContext, visited = new Set()) {
     if (!startNode || visited.has(startNode.id)) {
       return; // Prevent infinite loops
@@ -273,6 +308,16 @@ class BotRunner {
       const result = this.executeDataNode(node, flowData, dataContext);
       this.log('info', `Data node output: ${JSON.stringify(result)}`);
       return result;
+    }
+
+    // Handle action nodes - first execute any data dependencies
+    if (node.data.inputs) {
+      for (const input of node.data.inputs) {
+        if (input.type !== 'FLOW') {
+          // Find and execute any connected data nodes that haven't been executed yet
+          await this.executeDependencies(interaction, flowData, node.id, input.id, dataContext);
+        }
+      }
     }
 
     // Handle action nodes

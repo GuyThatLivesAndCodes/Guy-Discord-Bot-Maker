@@ -76,13 +76,16 @@ const ActionNode = ({ id, data }) => {
         <div className="action-node-config">
           {data.actionType === 'send-message' && (
             <div className="config-field">
-              <label>Message</label>
+              <label>Message Content</label>
               <textarea
                 value={data.config.content || ''}
                 onChange={(e) => handleConfigChange('content', e.target.value)}
-                placeholder="Enter message..."
+                placeholder="Type your message here, or connect a STRING input..."
                 rows={3}
               />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                💡 Tip: Connect a STRING output to override this text
+              </small>
             </div>
           )}
 
@@ -96,6 +99,9 @@ const ActionNode = ({ id, data }) => {
                   onChange={(e) => handleConfigChange('title', e.target.value)}
                   placeholder="Embed title"
                 />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Connect a STRING to use dynamic data
+                </small>
               </div>
 
               <div className="config-field">
@@ -103,9 +109,12 @@ const ActionNode = ({ id, data }) => {
                 <textarea
                   value={data.config.description || ''}
                   onChange={(e) => handleConfigChange('description', e.target.value)}
-                  placeholder="Embed description"
+                  placeholder="Main embed text"
                   rows={2}
                 />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Supports Discord markdown formatting
+                </small>
               </div>
 
               <div className="config-field">
@@ -259,8 +268,11 @@ const ActionNode = ({ id, data }) => {
                 type="text"
                 value={data.config.roleId || ''}
                 onChange={(e) => handleConfigChange('roleId', e.target.value)}
-                placeholder="Right-click role → Copy ID"
+                placeholder="123456789012345678"
               />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                💡 Right-click role → Copy ID (Developer Mode must be enabled)
+              </small>
             </div>
           )}
 
