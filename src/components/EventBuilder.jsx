@@ -13,9 +13,9 @@ const EVENT_TYPES = [
   },
   {
     type: 'responsive-trigger',
-    label: 'Responsive Trigger',
-    icon: '🤖',
-    description: 'AI-powered response triggers (Coming Soon)',
+    label: 'Event Trigger',
+    icon: '🎯',
+    description: 'Discord event triggers (user join/leave, message delete, etc.) - Coming Soon',
     available: false,
   },
 ];

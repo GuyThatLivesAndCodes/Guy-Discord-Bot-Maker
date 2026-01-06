@@ -20,9 +20,10 @@ const DataNode = ({ id, data }) => {
               id={input.id}
               style={{
                 background: DATA_TYPES[input.type]?.color || '#5865f2',
-                width: 10,
-                height: 10,
-                left: -5,
+                width: 12,
+                height: 12,
+                left: '-6px',
+                border: '2px solid #2b2d31',
               }}
             />
             <span className="input-label" style={{ color: DATA_TYPES[input.type]?.color }}>
@@ -42,9 +43,10 @@ const DataNode = ({ id, data }) => {
               id={output.id}
               style={{
                 background: DATA_TYPES[output.type]?.color || '#5865f2',
-                width: 10,
-                height: 10,
-                right: -5,
+                width: 12,
+                height: 12,
+                right: '-6px',
+                border: '2px solid #2b2d31',
               }}
             />
           </div>

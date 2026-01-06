@@ -149,6 +149,8 @@ class BotRunner {
     }
 
     try {
+      this.log('info', `Executing command graph with ${flowData.nodes.length} nodes and ${flowData.edges?.length || 0} edges`);
+
       // Initialize data context with trigger data
       const dataContext = {
         user: interaction.user,
@@ -162,14 +164,19 @@ class BotRunner {
       const startNodes = triggerNode ? [triggerNode] : this.findStartNodes(flowData);
 
       if (startNodes.length === 0) {
+        this.log('error', 'No starting point found in command flow');
         await interaction.reply({ content: 'No starting point found in command flow.', ephemeral: true });
         return;
       }
 
+      this.log('info', `Starting execution from node: ${startNodes[0].id}`);
+
       // Execute the flow starting from the trigger/start node
       await this.executeFlow(interaction, flowData, startNodes[0], dataContext);
+
+      this.log('success', 'Command executed successfully');
     } catch (error) {
-      this.log('error', `Command execution error: ${error.message}`);
+      this.log('error', `Command execution error: ${error.message}\nStack: ${error.stack}`);
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
       }
@@ -252,19 +259,26 @@ class BotRunner {
   }
 
   async executeNode(interaction, flowData, node, dataContext) {
+    this.log('info', `Executing node: ${node.id} (type: ${node.type})`);
+
     // Handle trigger nodes (just pass through)
     if (node.type === 'triggerNode') {
+      this.log('info', 'Trigger node - passing through');
       return true; // Continue to next nodes
     }
 
     // Handle data converter nodes
     if (node.type === 'dataNode') {
-      return this.executeDataNode(node, flowData, dataContext);
+      this.log('info', `Data node: ${node.data?.nodeType || 'unknown'}`);
+      const result = this.executeDataNode(node, flowData, dataContext);
+      this.log('info', `Data node output: ${JSON.stringify(result)}`);
+      return result;
     }
 
     // Handle action nodes
     const actionType = node.data.actionType;
     const config = node.data.config;
+    this.log('info', `Action node: ${actionType}`);
 
     switch (actionType) {
       case 'send-message':

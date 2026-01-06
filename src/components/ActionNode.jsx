@@ -42,7 +42,7 @@ const ActionNode = ({ id, data }) => {
 
   return (
     <div className="action-node" style={{ borderColor: data.color }}>
-      {/* Input handles */}
+      {/* Input handles - positioned along left side */}
       {data.inputs?.map((input, index) => (
         <Handle
           key={input.id}
@@ -51,10 +51,11 @@ const ActionNode = ({ id, data }) => {
           id={input.id}
           style={{
             background: DATA_TYPES[input.type]?.color || '#5865f2',
-            width: 10,
-            height: 10,
-            left: -5,
-            top: 30 + index * 20,
+            width: 12,
+            height: 12,
+            top: `${50 + index * 15}%`,
+            left: '-6px',
+            border: '2px solid #2b2d31',
           }}
         />
       ))}
@@ -291,7 +292,19 @@ const ActionNode = ({ id, data }) => {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} />
+      {/* Output handle for flow continuation */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="flow"
+        style={{
+          background: DATA_TYPES.FLOW.color,
+          width: 12,
+          height: 12,
+          right: '-6px',
+          border: '2px solid #2b2d31',
+        }}
+      />
     </div>
   );
 };

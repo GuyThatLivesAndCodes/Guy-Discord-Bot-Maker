@@ -23,7 +23,8 @@ const TriggerNode = ({ id, data }) => {
                 background: DATA_TYPES[output.type]?.color || '#5865f2',
                 width: 12,
                 height: 12,
-                right: -6,
+                right: '-6px',
+                border: '2px solid #2b2d31',
               }}
             />
           </div>
