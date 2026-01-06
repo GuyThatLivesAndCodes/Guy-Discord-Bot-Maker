@@ -1,7 +1,8 @@
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 
 class BotRunner {
-  constructor(config, logCallback) {
+  constructor(botId, config, logCallback) {
+    this.botId = botId;
     this.config = config;
     this.logCallback = logCallback;
     this.client = null;
@@ -11,7 +12,7 @@ class BotRunner {
   log(type, message) {
     const logEntry = {
       type, // 'info', 'error', 'success'
-      message,
+      message: `[${this.config.name || 'Bot'}] ${message}`,
       timestamp: new Date().toISOString(),
     };
     if (this.logCallback) {
@@ -43,9 +44,12 @@ class BotRunner {
     // Set up commands collection
     this.client.commands = new Collection();
 
-    // Register commands from config
-    if (this.config.commands && this.config.commands.length > 0) {
-      await this.registerCommands();
+    // Get command events from the events array
+    const commandEvents = (this.config.events || []).filter(event => event.type === 'command');
+
+    // Register commands from events
+    if (commandEvents.length > 0) {
+      await this.registerCommands(commandEvents);
     }
 
     // Set up event handlers
@@ -61,14 +65,14 @@ class BotRunner {
     }
   }
 
-  async registerCommands() {
-    const commands = this.config.commands.map(cmd => ({
+  async registerCommands(commandEvents) {
+    const commands = commandEvents.map(cmd => ({
       name: cmd.name,
       description: cmd.description || 'No description provided',
     }));
 
     // Store commands in the client
-    this.config.commands.forEach(cmd => {
+    commandEvents.forEach(cmd => {
       this.client.commands.set(cmd.name, cmd);
     });
 

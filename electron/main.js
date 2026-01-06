@@ -3,7 +3,7 @@ const path = require('path');
 const BotRunner = require('./botRunner');
 
 let mainWindow;
-let botRunner;
+const botRunners = new Map(); // Store multiple bot instances
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -35,9 +35,10 @@ function createWindow() {
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if (botRunner) {
-    botRunner.stop();
-  }
+  // Stop all running bots
+  botRunners.forEach((runner) => runner.stop());
+  botRunners.clear();
+
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -50,29 +51,32 @@ app.on('activate', () => {
 });
 
 // IPC handlers for bot operations
-ipcMain.handle('start-bot', async (event, config) => {
+ipcMain.handle('start-bot', async (event, botId, config) => {
   try {
-    if (botRunner) {
-      botRunner.stop();
+    // Stop bot if already running
+    if (botRunners.has(botId)) {
+      botRunners.get(botId).stop();
+      botRunners.delete(botId);
     }
 
-    botRunner = new BotRunner(config, (log) => {
-      // Send logs to renderer
-      mainWindow.webContents.send('bot-log', log);
+    const botRunner = new BotRunner(botId, config, (log) => {
+      // Send logs to renderer with bot ID
+      mainWindow.webContents.send('bot-log', { ...log, botId });
     });
 
     await botRunner.start();
+    botRunners.set(botId, botRunner);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle('stop-bot', async () => {
+ipcMain.handle('stop-bot', async (event, botId) => {
   try {
-    if (botRunner) {
-      botRunner.stop();
-      botRunner = null;
+    if (botRunners.has(botId)) {
+      botRunners.get(botId).stop();
+      botRunners.delete(botId);
     }
     return { success: true };
   } catch (error) {
@@ -80,26 +84,26 @@ ipcMain.handle('stop-bot', async () => {
   }
 });
 
-ipcMain.handle('save-config', async (event, config) => {
+ipcMain.handle('save-bots', async (event, bots) => {
   try {
     const fs = require('fs');
-    const configPath = path.join(app.getPath('userData'), 'bot-config.json');
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    const botsPath = path.join(app.getPath('userData'), 'bots.json');
+    fs.writeFileSync(botsPath, JSON.stringify(bots, null, 2));
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
   }
 });
 
-ipcMain.handle('load-config', async () => {
+ipcMain.handle('load-bots', async () => {
   try {
     const fs = require('fs');
-    const configPath = path.join(app.getPath('userData'), 'bot-config.json');
-    if (fs.existsSync(configPath)) {
-      const data = fs.readFileSync(configPath, 'utf8');
-      return { success: true, config: JSON.parse(data) };
+    const botsPath = path.join(app.getPath('userData'), 'bots.json');
+    if (fs.existsSync(botsPath)) {
+      const data = fs.readFileSync(botsPath, 'utf8');
+      return { success: true, bots: JSON.parse(data) };
     }
-    return { success: true, config: null };
+    return { success: true, bots: [] };
   } catch (error) {
     return { success: false, error: error.message };
   }

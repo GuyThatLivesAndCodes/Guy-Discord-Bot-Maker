@@ -22,6 +22,21 @@ function BotConfig({ config, onConfigChange, isRunning }) {
         </p>
 
         <div className="form-group">
+          <label htmlFor="name">
+            Bot Name *
+          </label>
+          <input
+            id="name"
+            type="text"
+            placeholder="My Awesome Bot"
+            value={localConfig.name || ''}
+            onChange={(e) => handleChange('name', e.target.value)}
+            disabled={isRunning}
+          />
+          <small>A friendly name to identify this bot</small>
+        </div>
+
+        <div className="form-group">
           <label htmlFor="token">
             Bot Token *
             <span className="tooltip">

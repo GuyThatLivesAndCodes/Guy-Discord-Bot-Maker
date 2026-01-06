@@ -1,10 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
-  startBot: (config) => ipcRenderer.invoke('start-bot', config),
-  stopBot: () => ipcRenderer.invoke('stop-bot'),
-  saveConfig: (config) => ipcRenderer.invoke('save-config', config),
-  loadConfig: () => ipcRenderer.invoke('load-config'),
+  startBot: (botId, config) => ipcRenderer.invoke('start-bot', botId, config),
+  stopBot: (botId) => ipcRenderer.invoke('stop-bot', botId),
+  saveBots: (bots) => ipcRenderer.invoke('save-bots', bots),
+  loadBots: () => ipcRenderer.invoke('load-bots'),
   onBotLog: (callback) => {
     ipcRenderer.on('bot-log', (event, log) => callback(log));
   },
