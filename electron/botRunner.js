@@ -140,7 +140,7 @@ class BotRunner {
   }
 
   async executeCommand(interaction, command) {
-    // Execute graph-based command flow
+    // Execute graph-based command flow with data flow support
     const flowData = command.flowData;
 
     if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
@@ -149,19 +149,30 @@ class BotRunner {
     }
 
     try {
-      // Find starting nodes (nodes with no incoming edges)
-      const startNodes = this.findStartNodes(flowData);
+      // Initialize data context with trigger data
+      const dataContext = {
+        user: interaction.user,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        member: interaction.member,
+      };
+
+      // Find trigger node or start nodes
+      const triggerNode = flowData.nodes.find(n => n.type === 'triggerNode');
+      const startNodes = triggerNode ? [triggerNode] : this.findStartNodes(flowData);
 
       if (startNodes.length === 0) {
         await interaction.reply({ content: 'No starting point found in command flow.', ephemeral: true });
         return;
       }
 
-      // Execute the flow starting from the first start node
-      await this.executeFlow(interaction, flowData, startNodes[0]);
+      // Execute the flow starting from the trigger/start node
+      await this.executeFlow(interaction, flowData, startNodes[0], dataContext);
     } catch (error) {
       this.log('error', `Command execution error: ${error.message}`);
-      await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
+      }
     }
   }
 
@@ -171,46 +182,103 @@ class BotRunner {
     return flowData.nodes.filter((node) => !nodesWithIncoming.has(node.id));
   }
 
-  getNextNodes(flowData, currentNodeId) {
-    const outgoingEdges = flowData.edges.filter((edge) => edge.source === currentNodeId);
-    return outgoingEdges.map((edge) =>
-      flowData.nodes.find((node) => node.id === edge.target)
-    ).filter(Boolean);
+  getConnectedNodes(flowData, currentNodeId, handleId = null) {
+    const outgoingEdges = flowData.edges.filter((edge) => {
+      if (handleId) {
+        return edge.source === currentNodeId && edge.sourceHandle === handleId;
+      }
+      return edge.source === currentNodeId;
+    });
+    return outgoingEdges.map((edge) => ({
+      node: flowData.nodes.find((node) => node.id === edge.target),
+      edge: edge,
+    })).filter(item => item.node);
   }
 
-  async executeFlow(interaction, flowData, startNode, visited = new Set()) {
+  getInputValue(flowData, nodeId, inputHandle, dataContext) {
+    // Find incoming edge for this input handle
+    const incomingEdge = flowData.edges.find(
+      e => e.target === nodeId && e.targetHandle === inputHandle
+    );
+
+    if (!incomingEdge) return null;
+
+    const sourceNode = flowData.nodes.find(n => n.id === incomingEdge.source);
+    if (!sourceNode) return null;
+
+    // Get value from data context based on source handle
+    const sourceHandle = incomingEdge.sourceHandle;
+
+    // Direct context data
+    if (sourceHandle === 'user') return dataContext.user;
+    if (sourceHandle === 'channel') return dataContext.channel;
+    if (sourceHandle === 'guild') return dataContext.guild;
+
+    // Check if value was computed by a data node
+    if (dataContext.computed && dataContext.computed[incomingEdge.source]) {
+      return dataContext.computed[incomingEdge.source][sourceHandle];
+    }
+
+    return null;
+  }
+
+  async executeFlow(interaction, flowData, startNode, dataContext, visited = new Set()) {
     if (!startNode || visited.has(startNode.id)) {
       return; // Prevent infinite loops
     }
 
     visited.add(startNode.id);
 
-    // Execute current node
-    const shouldContinue = await this.executeNode(interaction, startNode);
+    // Execute current node and get its output data
+    const nodeOutput = await this.executeNode(interaction, flowData, startNode, dataContext);
 
-    if (!shouldContinue) {
+    if (nodeOutput === false) {
       return; // Stop execution if node returns false
     }
 
-    // Get next nodes
-    const nextNodes = this.getNextNodes(flowData, startNode.id);
+    // Store computed data from this node
+    if (nodeOutput && typeof nodeOutput === 'object') {
+      if (!dataContext.computed) dataContext.computed = {};
+      dataContext.computed[startNode.id] = nodeOutput;
+    }
+
+    // Get next nodes connected via flow output
+    const nextConnections = this.getConnectedNodes(flowData, startNode.id, 'flow');
 
     // Execute all next nodes
-    for (const nextNode of nextNodes) {
-      await this.executeFlow(interaction, flowData, nextNode, visited);
+    for (const { node } of nextConnections) {
+      await this.executeFlow(interaction, flowData, node, dataContext, visited);
     }
   }
 
-  async executeNode(interaction, node) {
+  async executeNode(interaction, flowData, node, dataContext) {
+    // Handle trigger nodes (just pass through)
+    if (node.type === 'triggerNode') {
+      return true; // Continue to next nodes
+    }
+
+    // Handle data converter nodes
+    if (node.type === 'dataNode') {
+      return this.executeDataNode(node, flowData, dataContext);
+    }
+
+    // Handle action nodes
     const actionType = node.data.actionType;
     const config = node.data.config;
 
     switch (actionType) {
       case 'send-message':
+        // Check for connected string input
+        let messageContent = config.content || 'Hello!';
+        const connectedContent = this.getInputValue(flowData, node.id, 'content', dataContext);
+        if (connectedContent) {
+          messageContent = connectedContent;
+        }
+
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: config.content || 'Hello!' });
+          await interaction.reply({ content: messageContent });
         } else {
-          await interaction.followUp({ content: config.content || 'Hello!' });
+          await interaction.followUp({ content: messageContent });
         }
         break;
 
@@ -219,14 +287,21 @@ class BotRunner {
           color: parseInt(config.color?.replace('#', '0x') || '0x5865f2'),
         };
 
-        if (config.title) embed.title = config.title;
-        if (config.description) embed.description = config.description;
-        if (config.url) embed.url = config.url;
-        if (config.thumbnail) embed.thumbnail = { url: config.thumbnail };
-        if (config.image) embed.image = { url: config.image };
+        // Check for connected string inputs
+        const embedTitle = this.getInputValue(flowData, node.id, 'title', dataContext) || config.title;
+        const embedDesc = this.getInputValue(flowData, node.id, 'description', dataContext) || config.description;
+        const embedAuthor = this.getInputValue(flowData, node.id, 'author', dataContext) || config.author;
+        const embedThumbnail = this.getInputValue(flowData, node.id, 'thumbnail', dataContext) || config.thumbnail;
+        const embedImage = this.getInputValue(flowData, node.id, 'image', dataContext) || config.image;
 
-        if (config.author) {
-          embed.author = { name: config.author };
+        if (embedTitle) embed.title = embedTitle;
+        if (embedDesc) embed.description = embedDesc;
+        if (config.url) embed.url = config.url;
+        if (embedThumbnail) embed.thumbnail = { url: embedThumbnail };
+        if (embedImage) embed.image = { url: embedImage };
+
+        if (embedAuthor) {
+          embed.author = { name: embedAuthor };
           if (config.authorIcon) embed.author.iconURL = config.authorIcon;
           if (config.authorUrl) embed.author.url = config.authorUrl;
         }
@@ -284,6 +359,52 @@ class BotRunner {
     }
 
     return true; // Continue to next nodes
+  }
+
+  executeDataNode(node, flowData, dataContext) {
+    const nodeType = node.data.nodeType;
+
+    // Get input values
+    const getUserInput = (inputId) => this.getInputValue(flowData, node.id, inputId, dataContext);
+
+    const output = {};
+
+    switch (nodeType) {
+      case 'get-user-name':
+        const user = getUserInput('user');
+        output.name = user?.username || 'Unknown';
+        break;
+
+      case 'get-user-avatar':
+        const avatarUser = getUserInput('user');
+        output.url = avatarUser?.displayAvatarURL?.() || '';
+        break;
+
+      case 'get-user-id':
+        const idUser = getUserInput('user');
+        output.id = idUser?.id || '';
+        break;
+
+      case 'get-channel-name':
+        const channel = getUserInput('channel');
+        output.name = channel?.name || 'Unknown';
+        break;
+
+      case 'get-channel-id':
+        const idChannel = getUserInput('channel');
+        output.id = idChannel?.id || '';
+        break;
+
+      case 'get-guild-name':
+        const guild = getUserInput('guild');
+        output.name = guild?.name || 'Unknown';
+        break;
+
+      default:
+        break;
+    }
+
+    return output; // Return computed values
   }
 
   evaluateCondition(interaction, config) {

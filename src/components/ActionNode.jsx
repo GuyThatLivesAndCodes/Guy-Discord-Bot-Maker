@@ -2,6 +2,16 @@ import React, { memo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import './ActionNode.css';
 
+// Data types - duplicated to avoid circular dependency
+const DATA_TYPES = {
+  FLOW: { color: '#5865f2', label: 'Flow' },
+  USER: { color: '#f23f43', label: 'User' },
+  CHANNEL: { color: '#43b581', label: 'Channel' },
+  GUILD: { color: '#7289da', label: 'Guild' },
+  STRING: { color: '#faa61a', label: 'String' },
+  NUMBER: { color: '#00aff4', label: 'Number' },
+};
+
 const ActionNode = ({ id, data }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -32,7 +42,22 @@ const ActionNode = ({ id, data }) => {
 
   return (
     <div className="action-node" style={{ borderColor: data.color }}>
-      <Handle type="target" position={Position.Top} />
+      {/* Input handles */}
+      {data.inputs?.map((input, index) => (
+        <Handle
+          key={input.id}
+          type="target"
+          position={Position.Left}
+          id={input.id}
+          style={{
+            background: DATA_TYPES[input.type]?.color || '#5865f2',
+            width: 10,
+            height: 10,
+            left: -5,
+            top: 30 + index * 20,
+          }}
+        />
+      ))}
 
       <div className="action-node-header" style={{ background: data.color }}>
         <span className="action-node-icon">{data.icon}</span>

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -11,11 +11,85 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import Modal from './Modal';
 import ActionNodeComponent from './ActionNode';
+import TriggerNodeComponent from './TriggerNode';
+import DataNodeComponent from './DataNode';
 import './FlowEventEditor.css';
 
 const nodeTypes = {
   actionNode: ActionNodeComponent,
+  triggerNode: TriggerNodeComponent,
+  dataNode: DataNodeComponent,
 };
+
+// Data types with colors
+export const DATA_TYPES = {
+  FLOW: { color: '#5865f2', label: 'Flow' },
+  USER: { color: '#f23f43', label: 'User' },
+  CHANNEL: { color: '#43b581', label: 'Channel' },
+  GUILD: { color: '#7289da', label: 'Guild' },
+  STRING: { color: '#faa61a', label: 'String' },
+  NUMBER: { color: '#00aff4', label: 'Number' },
+};
+
+// Trigger node (auto-added for commands)
+const TRIGGER_NODE = {
+  type: 'on-command-ran',
+  label: 'On Command Ran',
+  icon: '⚡',
+  color: '#5865f2',
+};
+
+// Data converter nodes
+const DATA_NODES = [
+  {
+    type: 'get-user-name',
+    label: 'Get User Name',
+    icon: '👤',
+    color: '#f23f43',
+    inputs: [{ id: 'user', type: 'USER' }],
+    outputs: [{ id: 'name', type: 'STRING' }],
+  },
+  {
+    type: 'get-user-avatar',
+    label: 'Get User Avatar',
+    icon: '🖼️',
+    color: '#f23f43',
+    inputs: [{ id: 'user', type: 'USER' }],
+    outputs: [{ id: 'url', type: 'STRING' }],
+  },
+  {
+    type: 'get-user-id',
+    label: 'Get User ID',
+    icon: '🔢',
+    color: '#f23f43',
+    inputs: [{ id: 'user', type: 'USER' }],
+    outputs: [{ id: 'id', type: 'STRING' }],
+  },
+  {
+    type: 'get-channel-name',
+    label: 'Get Channel Name',
+    icon: '💬',
+    color: '#43b581',
+    inputs: [{ id: 'channel', type: 'CHANNEL' }],
+    outputs: [{ id: 'name', type: 'STRING' }],
+  },
+  {
+    type: 'get-channel-id',
+    label: 'Get Channel ID',
+    icon: '🔢',
+    color: '#43b581',
+    inputs: [{ id: 'channel', type: 'CHANNEL' }],
+    outputs: [{ id: 'id', type: 'STRING' }],
+  },
+  {
+    type: 'get-guild-name',
+    label: 'Get Guild Name',
+    icon: '🏰',
+    color: '#7289da',
+    inputs: [{ id: 'guild', type: 'GUILD' }],
+    outputs: [{ id: 'name', type: 'STRING' }],
+  },
+];
 
 // Action types available
 const ACTION_TYPES = [
@@ -25,6 +99,10 @@ const ACTION_TYPES = [
     icon: '💬',
     color: '#5865f2',
     defaultData: { content: 'Hello, World!' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'content', type: 'STRING', optional: true },
+    ],
   },
   {
     type: 'embed',
@@ -46,6 +124,14 @@ const ACTION_TYPES = [
       url: '',
       timestamp: false,
     },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'title', type: 'STRING', optional: true },
+      { id: 'description', type: 'STRING', optional: true },
+      { id: 'author', type: 'STRING', optional: true },
+      { id: 'thumbnail', type: 'STRING', optional: true },
+      { id: 'image', type: 'STRING', optional: true },
+    ],
   },
   {
     type: 'add-role',
@@ -53,6 +139,7 @@ const ACTION_TYPES = [
     icon: '🎭',
     color: '#faa81a',
     defaultData: { roleId: '' },
+    inputs: [{ id: 'flow', type: 'FLOW' }],
   },
   {
     type: 'remove-role',
@@ -60,6 +147,7 @@ const ACTION_TYPES = [
     icon: '👤',
     color: '#ed4245',
     defaultData: { roleId: '' },
+    inputs: [{ id: 'flow', type: 'FLOW' }],
   },
   {
     type: 'condition',
@@ -67,6 +155,7 @@ const ACTION_TYPES = [
     icon: '🔀',
     color: '#00aff4',
     defaultData: { condition: 'has-role', value: '' },
+    inputs: [{ id: 'flow', type: 'FLOW' }],
   },
 ];
 
@@ -85,7 +174,30 @@ function FlowEventEditor({ event, onSave, onClose }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [loopWarning, setLoopWarning] = useState(null);
 
-  // Detect loops in the graph
+  // Auto-add trigger node if it doesn't exist
+  useEffect(() => {
+    if (nodes.length === 0 || !nodes.find(n => n.type === 'triggerNode')) {
+      const triggerNode = {
+        id: 'trigger-node',
+        type: 'triggerNode',
+        position: { x: 250, y: 50 },
+        data: {
+          label: TRIGGER_NODE.label,
+          icon: TRIGGER_NODE.icon,
+          color: TRIGGER_NODE.color,
+          outputs: [
+            { id: 'flow', type: 'FLOW', label: 'Flow' },
+            { id: 'user', type: 'USER', label: 'User' },
+            { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+            { id: 'guild', type: 'GUILD', label: 'Guild' },
+          ],
+        },
+        draggable: false,
+      };
+      setNodes([triggerNode, ...nodes]);
+    }
+  }, []);
+
   const detectLoops = useCallback((currentEdges) => {
     const adjacency = {};
     currentEdges.forEach((edge) => {
@@ -123,19 +235,51 @@ function FlowEventEditor({ event, onSave, onClose }) {
     return false;
   }, []);
 
+  const isValidConnection = useCallback((connection, nodes, edges) => {
+    const sourceNode = nodes.find(n => n.id === connection.source);
+    const targetNode = nodes.find(n => n.id === connection.target);
+
+    if (!sourceNode || !targetNode) return false;
+
+    // Get output type from source handle
+    const sourceHandle = connection.sourceHandle;
+    const targetHandle = connection.targetHandle;
+
+    // For now, allow all connections (we'll validate types in execution)
+    return true;
+  }, []);
+
   const onConnect = useCallback(
     (params) => {
+      if (!isValidConnection(params, nodes, edges)) {
+        setLoopWarning('❌ Invalid connection! Data types don\'t match.');
+        setTimeout(() => setLoopWarning(null), 3000);
+        return;
+      }
+
+      const sourceNode = nodes.find(n => n.id === params.source);
+      const sourceHandle = params.sourceHandle;
+
+      // Get color based on handle type
+      let edgeColor = DATA_TYPES.FLOW.color;
+      if (sourceHandle?.includes('user')) edgeColor = DATA_TYPES.USER.color;
+      else if (sourceHandle?.includes('channel')) edgeColor = DATA_TYPES.CHANNEL.color;
+      else if (sourceHandle?.includes('guild')) edgeColor = DATA_TYPES.GUILD.color;
+      else if (sourceHandle?.includes('name') || sourceHandle?.includes('id') || sourceHandle?.includes('content')) {
+        edgeColor = DATA_TYPES.STRING.color;
+      }
+
       const newEdges = addEdge(
         {
           ...params,
           type: 'smoothstep',
           animated: true,
-          markerEnd: { type: MarkerType.ArrowClosed },
+          markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
+          style: { stroke: edgeColor, strokeWidth: 2 },
         },
         edges
       );
 
-      // Check for loops
       if (detectLoops(newEdges)) {
         setLoopWarning('⚠️ Loop detected! This connection creates a cycle in your flow.');
         setTimeout(() => setLoopWarning(null), 3000);
@@ -143,24 +287,42 @@ function FlowEventEditor({ event, onSave, onClose }) {
 
       setEdges(newEdges);
     },
-    [edges, setEdges, detectLoops]
+    [edges, setEdges, detectLoops, nodes, isValidConnection]
   );
 
   const onNodeClick = useCallback((event, node) => {
     setSelectedNode(node);
   }, []);
 
+  const addDataNode = (dataNodeType) => {
+    const newNode = {
+      id: `node-${Date.now()}`,
+      type: 'dataNode',
+      position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 200 },
+      data: {
+        nodeType: dataNodeType.type,
+        label: dataNodeType.label,
+        icon: dataNodeType.icon,
+        color: dataNodeType.color,
+        inputs: dataNodeType.inputs,
+        outputs: dataNodeType.outputs,
+      },
+    };
+    setNodes((nds) => [...nds, newNode]);
+  };
+
   const addActionNode = (actionType) => {
     const newNode = {
       id: `node-${Date.now()}`,
       type: 'actionNode',
-      position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
+      position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 300 },
       data: {
         actionType: actionType.type,
         label: actionType.label,
         icon: actionType.icon,
         color: actionType.color,
         config: { ...actionType.defaultData },
+        inputs: actionType.inputs || [{ id: 'flow', type: 'FLOW' }],
         onUpdate: updateNodeData,
       },
     };
@@ -189,6 +351,7 @@ function FlowEventEditor({ event, onSave, onClose }) {
 
   const deleteNode = useCallback(
     (nodeId) => {
+      if (nodeId === 'trigger-node') return; // Can't delete trigger node
       setNodes((nds) => nds.filter((node) => node.id !== nodeId));
       setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
       setSelectedNode(null);
@@ -250,9 +413,37 @@ function FlowEventEditor({ event, onSave, onClose }) {
             )}
           </div>
 
+          <div className="data-types-legend">
+            <h4>Data Types</h4>
+            {Object.entries(DATA_TYPES).map(([key, value]) => (
+              <div key={key} className="data-type-item">
+                <div className="data-type-dot" style={{ background: value.color }}></div>
+                <span>{value.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="actions-palette">
+            <h4>Data Nodes</h4>
+            <p className="palette-description">Convert data types</p>
+            <div className="action-type-list">
+              {DATA_NODES.map((dataNode) => (
+                <button
+                  key={dataNode.type}
+                  className="action-type-button"
+                  style={{ borderLeft: `4px solid ${dataNode.color}` }}
+                  onClick={() => addDataNode(dataNode)}
+                >
+                  <span className="action-icon">{dataNode.icon}</span>
+                  <span>{dataNode.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="actions-palette">
             <h4>Action Nodes</h4>
-            <p className="palette-description">Click to add to graph</p>
+            <p className="palette-description">Execute actions</p>
             <div className="action-type-list">
               {ACTION_TYPES.map((actionType) => (
                 <button
@@ -283,8 +474,8 @@ function FlowEventEditor({ event, onSave, onClose }) {
         <div className="flow-editor-canvas">
           <div className="canvas-info">
             <span>📍 Drag nodes to position</span>
-            <span>🔗 Drag from handle to create connections</span>
-            <span>🗑️ Select node and press Delete to remove</span>
+            <span>🔗 Connect colored handles by type</span>
+            <span>🗑️ Select node and press Delete</span>
           </div>
           <ReactFlow
             nodes={nodes}
