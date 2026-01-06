@@ -1,0 +1,82 @@
+.bot-editor {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 300px);
+}
+
+.bot-editor-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 20px;
+  color: #ed4245;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  background: #2b2d31;
+  border-bottom: 1px solid #383a40;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.back-btn {
+  background: transparent;
+  border: 1px solid #5865f2;
+  color: #5865f2;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: #5865f2;
+  color: white;
+  transform: translateX(-2px);
+}
+
+.bot-title {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.bot-title h1 {
+  font-size: 24px;
+  color: #ffffff;
+  margin: 0;
+}
+
+.editor-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 30px;
+}
+
+.editor-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.editor-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.editor-content::-webkit-scrollbar-thumb {
+  background: #4e5058;
+  border-radius: 4px;
+}
+
+.editor-content::-webkit-scrollbar-thumb:hover {
+  background: #5865f2;
+}

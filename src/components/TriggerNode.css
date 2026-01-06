@@ -1,0 +1,46 @@
+.trigger-node {
+  background: #2b2d31;
+  border: 3px solid #5865f2;
+  border-radius: 8px;
+  min-width: 200px;
+  box-shadow: 0 8px 24px rgba(88, 101, 242, 0.6);
+}
+
+.trigger-node-header {
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 5px 5px 0 0;
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.trigger-node-icon {
+  font-size: 20px;
+}
+
+.trigger-node-outputs {
+  padding: 12px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.trigger-output {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: #1e1e1e;
+  border-radius: 4px;
+  position: relative;
+  font-size: 13px;
+  color: #b5bac1;
+  font-weight: 600;
+}
+
+.output-label {
+  flex: 1;
+}

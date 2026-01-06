@@ -1,0 +1,195 @@
+/* Import from CommandBuilder since they share many styles */
+@import './CommandBuilder.css';
+
+/* Additional event-specific styles */
+.event-type-selector {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.selector-header h2 {
+  font-size: 28px;
+  color: #ffffff;
+}
+
+.event-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.event-type-card {
+  background: #2b2d31;
+  border-radius: 12px;
+  padding: 40px 30px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  border: 2px solid transparent;
+  position: relative;
+}
+
+.event-type-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-color: #5865f2;
+}
+
+.event-type-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.event-type-card.disabled:hover {
+  transform: none;
+  border-color: transparent;
+}
+
+.event-type-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.event-type-card h3 {
+  margin-bottom: 10px;
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.event-type-card p {
+  color: #b5bac1;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.coming-soon-badge {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: #faa81a;
+  color: #1e1e1e;
+  padding: 5px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.event-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1e1e1e;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.event-icon {
+  font-size: 18px;
+}
+
+.event-type-label {
+  font-size: 14px;
+}
+
+.event-builder {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.events-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .events-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .events-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1440px) {
+  .events-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.event-card {
+  background: #2b2d31;
+  border-radius: 8px;
+  padding: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.event-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.event-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.event-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.event-actions button {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+.event-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #5865f2;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 10px;
+}
+
+.event-description {
+  color: #b5bac1;
+  margin-bottom: 15px;
+  line-height: 1.5;
+}
+
+.event-stats {
+  display: flex;
+  gap: 15px;
+}
+
+/* Update references to command to event */
+.event-editor {
+  background: #2b2d31;
+  border-radius: 8px;
+  padding: 30px;
+}
+
+.event-action-item {
+  background: #2b2d31;
+  border-radius: 6px;
+  padding: 15px;
+  margin-bottom: 15px;
+  animation: slideIn 0.3s ease-out;
+}

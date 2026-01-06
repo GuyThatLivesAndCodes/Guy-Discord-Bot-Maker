@@ -1,0 +1,1033 @@
+const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+
+class BotRunner {
+  constructor(botId, config, logCallback) {
+    this.botId = botId;
+    this.config = config;
+    this.logCallback = logCallback;
+    this.client = null;
+    this.isRunning = false;
+  }
+
+  log(type, message) {
+    const logEntry = {
+      type, // 'info', 'error', 'success'
+      message: `[${this.config.name || 'Bot'}] ${message}`,
+      timestamp: new Date().toISOString(),
+    };
+    if (this.logCallback) {
+      this.logCallback(logEntry);
+    }
+  }
+
+  determineRequiredIntents() {
+    // Base intents always needed
+    const intents = [
+      GatewayIntentBits.Guilds,
+    ];
+
+    // Analyze all events to determine which intents are needed
+    const events = this.config.events || [];
+    const usedNodeTypes = new Set();
+
+    // Collect all node types used across all events
+    events.forEach(event => {
+      if (event.flowData && event.flowData.nodes) {
+        event.flowData.nodes.forEach(node => {
+          if (node.type === 'dataNode' && node.data?.nodeType) {
+            usedNodeTypes.add(node.data.nodeType);
+          } else if (node.data?.actionType) {
+            usedNodeTypes.add(node.data.actionType);
+          }
+        });
+      }
+    });
+
+    // Voice-related nodes need GuildVoiceStates
+    const voiceNodes = ['join-voice', 'leave-voice', 'move-member-voice', 'mute-member-voice', 'deafen-member-voice'];
+    if (voiceNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
+      intents.push(GatewayIntentBits.GuildVoiceStates);
+      this.log('info', 'Voice nodes detected - loading GuildVoiceStates intent');
+    }
+
+    // Message-related nodes need GuildMessages and MessageContent
+    const messageNodes = ['send-message', 'delete-message', 'pin-message', 'create-thread', 'react-emoji'];
+    if (messageNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
+      intents.push(GatewayIntentBits.GuildMessages);
+      intents.push(GatewayIntentBits.MessageContent);
+      this.log('info', 'Message nodes detected - loading GuildMessages and MessageContent intents');
+    }
+
+    // Member-related nodes need GuildMembers
+    const memberNodes = ['timeout-member', 'kick-member', 'ban-member', 'unban-member', 'add-role', 'remove-role',
+                         'get-member-joindate', 'get-member-count', 'check-has-role'];
+    if (memberNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
+      intents.push(GatewayIntentBits.GuildMembers);
+      this.log('info', 'Member nodes detected - loading GuildMembers intent');
+    }
+
+    // Remove duplicates and return
+    return [...new Set(intents)];
+  }
+
+  async start() {
+    if (this.isRunning) {
+      throw new Error('Bot is already running');
+    }
+
+    if (!this.config.token) {
+      throw new Error('Bot token is required');
+    }
+
+    this.log('info', 'Starting bot...');
+
+    // Determine required intents based on nodes used
+    const requiredIntents = this.determineRequiredIntents();
+    this.log('info', `Loading ${requiredIntents.length} intents based on nodes used`);
+
+    // Create Discord client with dynamically determined intents
+    this.client = new Client({
+      intents: requiredIntents,
+    });
+
+    // Set up commands collection
+    this.client.commands = new Collection();
+
+    // Get command events from the events array
+    const commandEvents = (this.config.events || []).filter(event => event.type === 'command');
+
+    // Register commands from events
+    if (commandEvents.length > 0) {
+      await this.registerCommands(commandEvents);
+    }
+
+    // Set up event handlers
+    this.setupEventHandlers();
+
+    // Login to Discord
+    try {
+      await this.client.login(this.config.token);
+      this.isRunning = true;
+    } catch (error) {
+      this.log('error', `Failed to login: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async registerCommands(commandEvents) {
+    const commands = commandEvents.map(cmd => {
+      const command = {
+        name: cmd.name,
+        description: cmd.description || 'No description provided',
+      };
+
+      // Add command options if they exist
+      if (cmd.options && cmd.options.length > 0) {
+        command.options = cmd.options.map(opt => {
+          const option = {
+            name: opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'), // Discord requires lowercase alphanumeric
+            description: opt.description || `${opt.name} parameter`,
+            required: opt.required || false,
+          };
+
+          // Map our types to Discord's ApplicationCommandOptionType
+          const typeMap = {
+            'STRING': 3,
+            'NUMBER': 10,
+            'BOOLEAN': 5,
+            'USER': 6,
+            'CHANNEL': 7,
+            'ROLE': 8,
+          };
+
+          option.type = typeMap[opt.type] || 3; // Default to STRING
+          return option;
+        });
+      }
+
+      return command;
+    });
+
+    // Store commands in the client
+    commandEvents.forEach(cmd => {
+      this.client.commands.set(cmd.name, cmd);
+    });
+
+    // Register slash commands with Discord
+    if (this.config.applicationId) {
+      try {
+        const rest = new REST({ version: '10' }).setToken(this.config.token);
+
+        if (this.config.guildId) {
+          // Register to specific guild (instant update)
+          await rest.put(
+            Routes.applicationGuildCommands(this.config.applicationId, this.config.guildId),
+            { body: commands }
+          );
+          this.log('info', `Registered ${commands.length} guild commands`);
+        } else {
+          // Register globally (takes up to 1 hour)
+          await rest.put(
+            Routes.applicationCommands(this.config.applicationId),
+            { body: commands }
+          );
+          this.log('info', `Registered ${commands.length} global commands`);
+        }
+      } catch (error) {
+        this.log('error', `Failed to register commands: ${error.message}`);
+      }
+    }
+  }
+
+  setupEventHandlers() {
+    this.client.once('ready', () => {
+      this.log('success', `Bot is online as ${this.client.user.tag}`);
+      this.log('info', `Serving ${this.client.guilds.cache.size} servers`);
+    });
+
+    this.client.on('interactionCreate', async (interaction) => {
+      if (!interaction.isChatInputCommand()) return;
+
+      const command = this.client.commands.get(interaction.commandName);
+      if (!command) return;
+
+      try {
+        // Execute command based on its actions
+        await this.executeCommand(interaction, command);
+        this.log('info', `Executed command: /${interaction.commandName} by ${interaction.user.tag}`);
+      } catch (error) {
+        this.log('error', `Command error: ${error.message}`);
+        const errorMessage = 'There was an error executing this command!';
+
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp({ content: errorMessage, ephemeral: true });
+        } else {
+          await interaction.reply({ content: errorMessage, ephemeral: true });
+        }
+      }
+    });
+
+    this.client.on('error', (error) => {
+      this.log('error', `Client error: ${error.message}`);
+    });
+
+    this.client.on('disconnect', () => {
+      this.log('info', 'Bot disconnected');
+    });
+  }
+
+  async executeCommand(interaction, command) {
+    // Execute graph-based command flow with data flow support
+    const flowData = command.flowData;
+
+    if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
+      await interaction.reply({ content: 'This command has no actions configured.', ephemeral: true });
+      return;
+    }
+
+    try {
+      this.log('info', `Executing command graph with ${flowData.nodes.length} nodes and ${flowData.edges?.length || 0} edges`);
+
+      // Initialize data context with trigger data
+      const dataContext = {
+        user: interaction.user,
+        channel: interaction.channel,
+        guild: interaction.guild,
+        member: interaction.member,
+      };
+
+      // Add command option values to data context
+      if (command.options && command.options.length > 0) {
+        command.options.forEach(opt => {
+          const optionName = opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+          const value = interaction.options.get(optionName);
+
+          if (value) {
+            // Store the actual value based on type
+            if (opt.type === 'USER') {
+              dataContext[`option-${opt.name}`] = value.user || value.member?.user;
+            } else if (opt.type === 'CHANNEL') {
+              dataContext[`option-${opt.name}`] = value.channel;
+            } else if (opt.type === 'ROLE') {
+              dataContext[`option-${opt.name}`] = value.role;
+            } else {
+              dataContext[`option-${opt.name}`] = value.value;
+            }
+          }
+        });
+      }
+
+      // Find trigger node or start nodes
+      const triggerNode = flowData.nodes.find(n => n.type === 'triggerNode');
+      const startNodes = triggerNode ? [triggerNode] : this.findStartNodes(flowData);
+
+      if (startNodes.length === 0) {
+        this.log('error', 'No starting point found in command flow');
+        await interaction.reply({ content: 'No starting point found in command flow.', ephemeral: true });
+        return;
+      }
+
+      this.log('info', `Starting execution from node: ${startNodes[0].id}`);
+
+      // Execute the flow starting from the trigger/start node
+      await this.executeFlow(interaction, flowData, startNodes[0], dataContext);
+
+      this.log('success', 'Command executed successfully');
+    } catch (error) {
+      this.log('error', `Command execution error: ${error.message}\nStack: ${error.stack}`);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: 'An error occurred while executing this command.', ephemeral: true });
+      }
+    }
+  }
+
+  findStartNodes(flowData) {
+    const nodesWithIncoming = new Set();
+    flowData.edges.forEach((edge) => nodesWithIncoming.add(edge.target));
+    return flowData.nodes.filter((node) => !nodesWithIncoming.has(node.id));
+  }
+
+  getConnectedNodes(flowData, currentNodeId, handleId = null) {
+    const outgoingEdges = flowData.edges.filter((edge) => {
+      if (handleId) {
+        return edge.source === currentNodeId && edge.sourceHandle === handleId;
+      }
+      return edge.source === currentNodeId;
+    });
+    return outgoingEdges.map((edge) => ({
+      node: flowData.nodes.find((node) => node.id === edge.target),
+      edge: edge,
+    })).filter(item => item.node);
+  }
+
+  getInputValue(flowData, nodeId, inputHandle, dataContext) {
+    // Find incoming edge for this input handle
+    const incomingEdge = flowData.edges.find(
+      e => e.target === nodeId && e.targetHandle === inputHandle
+    );
+
+    if (!incomingEdge) return null;
+
+    const sourceNode = flowData.nodes.find(n => n.id === incomingEdge.source);
+    if (!sourceNode) return null;
+
+    // Get value from data context based on source handle
+    const sourceHandle = incomingEdge.sourceHandle;
+
+    // Direct context data
+    if (sourceHandle === 'user') return dataContext.user;
+    if (sourceHandle === 'channel') return dataContext.channel;
+    if (sourceHandle === 'guild') return dataContext.guild;
+
+    // Check for command option values
+    if (sourceHandle.startsWith('option-')) {
+      return dataContext[sourceHandle] || null;
+    }
+
+    // Check if value was computed by a data node
+    if (dataContext.computed && dataContext.computed[incomingEdge.source]) {
+      return dataContext.computed[incomingEdge.source][sourceHandle];
+    }
+
+    return null;
+  }
+
+  async executeDependencies(interaction, flowData, nodeId, inputHandle, dataContext) {
+    try {
+      // Find the edge connected to this input
+      const incomingEdge = flowData.edges.find(
+        e => e.target === nodeId && e.targetHandle === inputHandle
+      );
+
+      if (!incomingEdge) return;
+
+      const sourceNode = flowData.nodes.find(n => n.id === incomingEdge.source);
+      if (!sourceNode) {
+        this.log('warning', `Source node not found for edge to ${nodeId}.${inputHandle}`);
+        return;
+      }
+
+      // If this is a data node and it hasn't been computed yet, execute it
+      if (sourceNode.type === 'dataNode') {
+        if (!dataContext.computed || !dataContext.computed[sourceNode.id]) {
+          this.log('info', `Executing data dependency: ${sourceNode.id}`);
+
+          // Recursively execute any dependencies this data node has
+          if (sourceNode.data && sourceNode.data.inputs) {
+            for (const input of sourceNode.data.inputs) {
+              await this.executeDependencies(interaction, flowData, sourceNode.id, input.id, dataContext);
+            }
+          }
+
+          // Execute the data node
+          const result = await this.executeDataNode(sourceNode, flowData, dataContext);
+
+          // Store the result
+          if (!dataContext.computed) dataContext.computed = {};
+          dataContext.computed[sourceNode.id] = result;
+
+          this.log('info', `Data dependency result: ${JSON.stringify(result)}`);
+        }
+      }
+    } catch (error) {
+      this.log('error', `Error executing dependency for ${nodeId}.${inputHandle}: ${error.message}`);
+    }
+  }
+
+  async executeFlow(interaction, flowData, startNode, dataContext, visited = new Set()) {
+    if (!startNode || visited.has(startNode.id)) {
+      return; // Prevent infinite loops
+    }
+
+    visited.add(startNode.id);
+
+    // Execute current node and get its output data
+    const nodeOutput = await this.executeNode(interaction, flowData, startNode, dataContext);
+
+    if (nodeOutput === false) {
+      return; // Stop execution if node returns false
+    }
+
+    // Store computed data from this node (if it's an object and not a result object)
+    if (nodeOutput && typeof nodeOutput === 'object' && !nodeOutput.hasOwnProperty('success')) {
+      if (!dataContext.computed) dataContext.computed = {};
+      dataContext.computed[startNode.id] = nodeOutput;
+    }
+
+    // Handle branch nodes with conditional flow
+    if (startNode.data.actionType === 'branch') {
+      // Get the condition value
+      const conditionValue = this.getInputValue(flowData, startNode.id, 'condition', dataContext);
+
+      // If condition is null or undefined, don't execute either path
+      if (conditionValue === null || conditionValue === undefined) {
+        this.log('info', `Branch node condition is null/undefined, skipping both paths`);
+        return;
+      }
+
+      const outputHandle = conditionValue ? 'true' : 'false';
+      this.log('info', `Branch node condition: ${conditionValue}, following ${outputHandle} path`);
+
+      // Follow the appropriate output path
+      const nextConnections = this.getConnectedNodes(flowData, startNode.id, outputHandle);
+      for (const { node } of nextConnections) {
+        await this.executeFlow(interaction, flowData, node, dataContext, visited);
+      }
+    } else {
+      // Determine which output to follow (success or fail)
+      let outputHandle = 'flow';
+
+      // If node returned execution result with success flag
+      if (nodeOutput && typeof nodeOutput === 'object' && nodeOutput.hasOwnProperty('success')) {
+        outputHandle = nodeOutput.success ? 'flow' : 'fail';
+
+        // Store any returned data
+        if (nodeOutput.data) {
+          if (!dataContext.computed) dataContext.computed = {};
+          dataContext.computed[startNode.id] = nodeOutput.data;
+        }
+      }
+
+      // Get next nodes connected via the determined output
+      const nextConnections = this.getConnectedNodes(flowData, startNode.id, outputHandle);
+
+      // Execute all next nodes
+      for (const { node } of nextConnections) {
+        await this.executeFlow(interaction, flowData, node, dataContext, visited);
+      }
+    }
+  }
+
+  async executeNode(interaction, flowData, node, dataContext) {
+    this.log('info', `Executing node: ${node.id} (type: ${node.type})`);
+
+    // Handle trigger nodes (just pass through)
+    if (node.type === 'triggerNode') {
+      this.log('info', 'Trigger node - passing through');
+      return true; // Continue to next nodes
+    }
+
+    // Handle data converter nodes
+    if (node.type === 'dataNode') {
+      this.log('info', `Data node: ${node.data?.nodeType || 'unknown'}`);
+      const result = await this.executeDataNode(node, flowData, dataContext);
+      this.log('info', `Data node output: ${JSON.stringify(result)}`);
+      return result;
+    }
+
+    // Handle action nodes - first execute any data dependencies
+    if (node.data.inputs) {
+      for (const input of node.data.inputs) {
+        if (input.type !== 'FLOW') {
+          // Find and execute any connected data nodes that haven't been executed yet
+          await this.executeDependencies(interaction, flowData, node.id, input.id, dataContext);
+        }
+      }
+    }
+
+    // Handle action nodes
+    const actionType = node.data.actionType;
+    const config = node.data.config;
+    this.log('info', `Action node: ${actionType}`);
+
+    // Wrap all actions in try-catch for error handling
+    try {
+
+    switch (actionType) {
+      case 'send-message':
+        // Check for connected string input
+        let messageContent = config.content || 'Hello!';
+        const connectedContent = this.getInputValue(flowData, node.id, 'content', dataContext);
+        if (connectedContent) {
+          messageContent = connectedContent;
+        }
+
+        const messageOptions = {
+          content: messageContent,
+          ephemeral: config.ephemeral || false
+        };
+
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply(messageOptions);
+        } else {
+          await interaction.followUp(messageOptions);
+        }
+        break;
+
+      case 'embed':
+        const embed = {
+          color: parseInt(config.color?.replace('#', '0x') || '0x5865f2'),
+        };
+
+        // Check for connected string inputs
+        const embedTitle = this.getInputValue(flowData, node.id, 'title', dataContext) || config.title;
+        const embedDesc = this.getInputValue(flowData, node.id, 'description', dataContext) || config.description;
+        const embedAuthor = this.getInputValue(flowData, node.id, 'author', dataContext) || config.author;
+        const embedThumbnail = this.getInputValue(flowData, node.id, 'thumbnail', dataContext) || config.thumbnail;
+        const embedImage = this.getInputValue(flowData, node.id, 'image', dataContext) || config.image;
+
+        if (embedTitle) embed.title = embedTitle;
+        if (embedDesc) embed.description = embedDesc;
+        if (config.url) embed.url = config.url;
+        if (embedThumbnail) embed.thumbnail = { url: embedThumbnail };
+        if (embedImage) embed.image = { url: embedImage };
+
+        if (embedAuthor) {
+          embed.author = { name: embedAuthor };
+          if (config.authorIcon) embed.author.iconURL = config.authorIcon;
+          if (config.authorUrl) embed.author.url = config.authorUrl;
+        }
+
+        if (config.footer) {
+          embed.footer = { text: config.footer };
+          if (config.footerIcon) embed.footer.iconURL = config.footerIcon;
+        }
+
+        if (config.fields && config.fields.length > 0) {
+          embed.fields = config.fields;
+        }
+
+        if (config.timestamp) {
+          embed.timestamp = new Date().toISOString();
+        }
+
+        const embedOptions = {
+          embeds: [embed],
+          ephemeral: config.ephemeral || false
+        };
+
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply(embedOptions);
+        } else {
+          await interaction.followUp(embedOptions);
+        }
+        break;
+
+      case 'add-role':
+        if (config.roleId && interaction.member) {
+          const role = interaction.guild.roles.cache.get(config.roleId);
+          if (role) {
+            await interaction.member.roles.add(role);
+            if (!interaction.replied) {
+              await interaction.reply({ content: `Added role ${role.name}`, ephemeral: true });
+            }
+          }
+        }
+        break;
+
+      case 'remove-role':
+        if (config.roleId && interaction.member) {
+          const role = interaction.guild.roles.cache.get(config.roleId);
+          if (role) {
+            await interaction.member.roles.remove(role);
+            if (!interaction.replied) {
+              await interaction.reply({ content: `Removed role ${role.name}`, ephemeral: true });
+            }
+          }
+        }
+        break;
+
+      case 'send-dm':
+        const dmUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.user;
+        let dmContent = config.content || 'Hello!';
+        const connectedDmContent = this.getInputValue(flowData, node.id, 'content', dataContext);
+        if (connectedDmContent) {
+          dmContent = connectedDmContent;
+        }
+
+        try {
+          await dmUser.send(dmContent);
+          this.log('success', `Sent DM to ${dmUser.tag}`);
+        } catch (error) {
+          this.log('error', `Failed to send DM: ${error.message}`);
+        }
+        break;
+
+      case 'react-emoji':
+        try {
+          await interaction.react(config.emoji || '👍');
+          this.log('success', `Reacted with ${config.emoji}`);
+        } catch (error) {
+          this.log('error', `Failed to react: ${error.message}`);
+        }
+        break;
+
+      case 'branch':
+        // Branch node handles conditional flow - handled in executeFlow
+        // The branch logic is handled by checking outputs in executeFlow
+        break;
+
+      case 'timeout-member':
+        const timeoutUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const duration = this.getInputValue(flowData, node.id, 'duration', dataContext) || config.duration || 60;
+        const timeoutReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
+
+        try {
+          if (timeoutUser && timeoutUser.moderatable) {
+            const durationMs = duration * 1000; // Convert seconds to milliseconds
+            await timeoutUser.timeout(durationMs, timeoutReason);
+            this.log('success', `Timed out ${timeoutUser.user?.tag || 'user'} for ${duration}s`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to timeout member: ${error.message}`);
+        }
+        break;
+
+      case 'kick-member':
+        const kickUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const kickReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
+
+        try {
+          if (kickUser && kickUser.kickable) {
+            await kickUser.kick(kickReason);
+            this.log('success', `Kicked ${kickUser.user?.tag || 'user'}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to kick member: ${error.message}`);
+        }
+        break;
+
+      case 'ban-member':
+        const banUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const banReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
+
+        try {
+          if (banUser && banUser.bannable) {
+            await banUser.ban({ reason: banReason, deleteMessageDays: 0 });
+            this.log('success', `Banned ${banUser.user?.tag || 'user'}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to ban member: ${error.message}`);
+        }
+        break;
+
+      case 'unban-member':
+        const unbanUserId = this.getInputValue(flowData, node.id, 'userId', dataContext) || config.userId || '';
+
+        try {
+          if (unbanUserId && interaction.guild) {
+            await interaction.guild.members.unban(unbanUserId);
+            this.log('success', `Unbanned user ${unbanUserId}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to unban user: ${error.message}`);
+        }
+        break;
+
+      case 'move-member-voice':
+        const moveUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+        const targetChannel = this.getInputValue(flowData, node.id, 'channel', dataContext);
+
+        try {
+          if (moveUser && targetChannel && moveUser.voice?.channel) {
+            await moveUser.voice.setChannel(targetChannel);
+            this.log('success', `Moved ${moveUser.user?.tag} to ${targetChannel.name}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to move member: ${error.message}`);
+        }
+        break;
+
+      case 'mute-member-voice':
+        const muteUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+
+        try {
+          if (muteUser && muteUser.voice?.channel) {
+            await muteUser.voice.setMute(true);
+            this.log('success', `Voice muted ${muteUser.user?.tag}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to mute member: ${error.message}`);
+        }
+        break;
+
+      case 'deafen-member-voice':
+        const deafenUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
+
+        try {
+          if (deafenUser && deafenUser.voice?.channel) {
+            await deafenUser.voice.setDeaf(true);
+            this.log('success', `Voice deafened ${deafenUser.user?.tag}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to deafen member: ${error.message}`);
+        }
+        break;
+
+      case 'delete-message':
+        try {
+          if (interaction.message) {
+            await interaction.message.delete();
+            this.log('success', 'Deleted message');
+          }
+        } catch (error) {
+          this.log('error', `Failed to delete message: ${error.message}`);
+        }
+        break;
+
+      case 'pin-message':
+        try {
+          if (interaction.message) {
+            await interaction.message.pin();
+            this.log('success', 'Pinned message');
+          }
+        } catch (error) {
+          this.log('error', `Failed to pin message: ${error.message}`);
+        }
+        break;
+
+      case 'create-thread':
+        const threadName = this.getInputValue(flowData, node.id, 'name', dataContext) || config.name || 'New Thread';
+
+        try {
+          if (interaction.channel?.threads) {
+            const thread = await interaction.channel.threads.create({
+              name: threadName,
+              autoArchiveDuration: 60,
+              reason: 'Created via bot command',
+            });
+            this.log('success', `Created thread: ${threadName}`);
+          }
+        } catch (error) {
+          this.log('error', `Failed to create thread: ${error.message}`);
+        }
+        break;
+
+      case 'join-voice':
+        const voiceChannel = this.getInputValue(flowData, node.id, 'channel', dataContext) || config.channelId;
+
+        try {
+          // Note: Requires @discordjs/voice package for full implementation
+          this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
+          // Basic implementation would be:
+          // const { joinVoiceChannel } = require('@discordjs/voice');
+          // const connection = joinVoiceChannel({ ... });
+        } catch (error) {
+          this.log('error', `Failed to join voice channel: ${error.message}`);
+        }
+        break;
+
+      case 'leave-voice':
+        try {
+          // Note: Requires @discordjs/voice package for full implementation
+          this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
+          // Basic implementation would be:
+          // connection.destroy();
+        } catch (error) {
+          this.log('error', `Failed to leave voice channel: ${error.message}`);
+        }
+        break;
+
+      default:
+        this.log('warning', `Unknown action type: ${actionType}`);
+        break;
+    }
+
+    // Action executed successfully
+    return { success: true };
+
+    } catch (error) {
+      // Action failed - log error and return failure status
+      this.log('error', `Action ${actionType} failed: ${error.message}`);
+      return { success: false };
+    }
+  }
+
+  async executeDataNode(node, flowData, dataContext) {
+    const nodeType = node.data.nodeType;
+
+    if (!nodeType) {
+      this.log('error', `Data node ${node.id} missing nodeType`);
+      return {};
+    }
+
+    // Get input values with error handling
+    const getUserInput = (inputId) => {
+      try {
+        return this.getInputValue(flowData, node.id, inputId, dataContext);
+      } catch (error) {
+        this.log('error', `Error getting input ${inputId} for node ${node.id}: ${error.message}`);
+        return null;
+      }
+    };
+
+    const output = {};
+
+    try {
+
+    switch (nodeType) {
+      // Static value nodes (constants)
+      case 'static-boolean':
+        output.value = node.data.config?.value || false;
+        break;
+
+      case 'static-number':
+        output.value = node.data.config?.value || 0;
+        break;
+
+      case 'static-string':
+        output.value = node.data.config?.value || '';
+        break;
+
+      case 'get-user-name':
+        const user = getUserInput('user');
+        output.name = user?.username || 'Unknown';
+        break;
+
+      case 'get-user-avatar':
+        const avatarUser = getUserInput('user');
+        output.url = avatarUser?.displayAvatarURL?.() || '';
+        break;
+
+      case 'get-user-id':
+        const idUser = getUserInput('user');
+        output.id = idUser?.id || '';
+        break;
+
+      case 'get-channel-name':
+        const channel = getUserInput('channel');
+        output.name = channel?.name || 'Unknown';
+        break;
+
+      case 'get-channel-id':
+        const idChannel = getUserInput('channel');
+        output.id = idChannel?.id || '';
+        break;
+
+      case 'get-guild-name':
+        const guild = getUserInput('guild');
+        output.name = guild?.name || 'Unknown';
+        break;
+
+      // Utility nodes
+      case 'join-strings':
+        const string1 = getUserInput('string1') || '';
+        const string2 = getUserInput('string2') || '';
+        output.result = string1 + string2;
+        break;
+
+      case 'number-to-string':
+        const number = getUserInput('number');
+        output.string = number !== null && number !== undefined ? String(number) : '';
+        break;
+
+      case 'add-numbers':
+        const addA = parseFloat(getUserInput('a')) || 0;
+        const addB = parseFloat(getUserInput('b')) || 0;
+        output.result = addA + addB;
+        break;
+
+      case 'subtract-numbers':
+        const subA = parseFloat(getUserInput('a')) || 0;
+        const subB = parseFloat(getUserInput('b')) || 0;
+        output.result = subA - subB;
+        break;
+
+      case 'multiply-numbers':
+        const mulA = parseFloat(getUserInput('a')) || 0;
+        const mulB = parseFloat(getUserInput('b')) || 0;
+        output.result = mulA * mulB;
+        break;
+
+      case 'divide-numbers':
+        const divA = parseFloat(getUserInput('a')) || 0;
+        const divB = parseFloat(getUserInput('b')) || 1; // Avoid division by zero
+        output.result = divB !== 0 ? divA / divB : 0;
+        break;
+
+      case 'check-has-role':
+        const checkUser = getUserInput('user');
+        const roleId = getUserInput('roleId');
+        output.result = false;
+        if (checkUser && roleId && dataContext.member) {
+          output.result = dataContext.member.roles.cache.has(roleId);
+        }
+        break;
+
+      // String operations
+      case 'string-length':
+        const strForLength = getUserInput('string') || '';
+        output.length = strForLength.length;
+        break;
+
+      case 'string-contains':
+        const searchString = getUserInput('string') || '';
+        const searchTerm = getUserInput('search') || '';
+        output.result = searchString.includes(searchTerm);
+        break;
+
+      case 'string-lowercase':
+        const lowerStr = getUserInput('string') || '';
+        output.result = lowerStr.toLowerCase();
+        break;
+
+      case 'string-uppercase':
+        const upperStr = getUserInput('string') || '';
+        output.result = upperStr.toUpperCase();
+        break;
+
+      case 'string-to-number':
+        const numStr = getUserInput('string') || '0';
+        output.number = parseFloat(numStr) || 0;
+        break;
+
+      // Comparison operations
+      case 'number-greater-than':
+        const gtA = parseFloat(getUserInput('a')) || 0;
+        const gtB = parseFloat(getUserInput('b')) || 0;
+        output.result = gtA > gtB;
+        break;
+
+      case 'number-less-than':
+        const ltA = parseFloat(getUserInput('a')) || 0;
+        const ltB = parseFloat(getUserInput('b')) || 0;
+        output.result = ltA < ltB;
+        break;
+
+      case 'number-equals':
+        const eqA = parseFloat(getUserInput('a')) || 0;
+        const eqB = parseFloat(getUserInput('b')) || 0;
+        output.result = eqA === eqB;
+        break;
+
+      case 'compare-strings':
+        const strA = getUserInput('a') || '';
+        const strB = getUserInput('b') || '';
+        output.result = strA === strB;
+        break;
+
+      // Boolean operations
+      case 'boolean-not':
+        const boolValue = getUserInput('value');
+        output.result = !boolValue;
+        break;
+
+      case 'boolean-and':
+        const andA = getUserInput('a');
+        const andB = getUserInput('b');
+        output.result = andA && andB;
+        break;
+
+      case 'boolean-or':
+        const orA = getUserInput('a');
+        const orB = getUserInput('b');
+        output.result = orA || orB;
+        break;
+
+      // Random number
+      case 'random-number':
+        const min = parseFloat(getUserInput('min')) || 0;
+        const max = parseFloat(getUserInput('max')) || 100;
+        output.result = Math.floor(Math.random() * (max - min + 1)) + min;
+        break;
+
+      // Guild operations
+      case 'get-member-count':
+        const memberGuild = getUserInput('guild');
+        output.count = memberGuild?.memberCount || 0;
+        break;
+
+      // New data nodes - user info
+      case 'get-member-joindate':
+        const joinUser = getUserInput('user');
+        if (joinUser && dataContext.member) {
+          const joinDate = dataContext.member.joinedAt;
+          output.date = joinDate ? joinDate.toISOString() : '';
+        } else {
+          output.date = '';
+        }
+        break;
+
+      case 'get-user-created':
+        const createdUser = getUserInput('user');
+        if (createdUser && createdUser.createdAt) {
+          output.date = createdUser.createdAt.toISOString();
+        } else {
+          output.date = '';
+        }
+        break;
+
+      // Utility nodes
+      case 'wait-delay':
+        const seconds = parseFloat(getUserInput('seconds')) || 0;
+        if (seconds > 0) {
+          await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+        }
+        output.result = seconds;
+        break;
+
+      case 'format-number':
+        const numToFormat = parseFloat(getUserInput('number')) || 0;
+        const decimals = parseInt(getUserInput('decimals')) || 2;
+        output.result = numToFormat.toFixed(decimals);
+        break;
+
+      case 'current-timestamp':
+        output.timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+        break;
+
+      default:
+        this.log('warning', `Unknown data node type: ${nodeType}`);
+        break;
+    }
+
+    } catch (error) {
+      this.log('error', `Error executing data node ${nodeType}: ${error.message}`);
+      return {};
+    }
+
+    return output; // Return computed values
+  }
+
+  stop() {
+    if (this.client) {
+      this.log('info', 'Stopping bot...');
+      this.client.destroy();
+      this.client = null;
+      this.isRunning = false;
+      this.log('success', 'Bot stopped successfully');
+    }
+  }
+}
+
+module.exports = BotRunner;
