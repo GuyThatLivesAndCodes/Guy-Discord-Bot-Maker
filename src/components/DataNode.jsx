@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
-import { DATA_TYPES } from './FlowEventEditor-new';
+import { DATA_TYPES } from './FlowEventEditor';
 import './DataNode.css';
 
 const DataNode = ({ id, data }) => {
