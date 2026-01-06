@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Handle, Position } from 'reactflow';
-import { DATA_TYPES } from './FlowEventEditor';
+import { DATA_TYPES } from '../constants/dataTypes';
 import './TriggerNode.css';
 
 const TriggerNode = ({ id, data }) => {

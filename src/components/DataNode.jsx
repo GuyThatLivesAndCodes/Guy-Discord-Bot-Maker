@@ -1,25 +1,97 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Handle, Position } from 'reactflow';
 import './DataNode.css';
-
-// Data types - duplicated to avoid circular dependency
-const DATA_TYPES = {
-  FLOW: { color: '#5865f2', label: 'Flow' },
-  USER: { color: '#f23f43', label: 'User' },
-  CHANNEL: { color: '#43b581', label: 'Channel' },
-  GUILD: { color: '#7289da', label: 'Guild' },
-  STRING: { color: '#faa61a', label: 'String' },
-  NUMBER: { color: '#00aff4', label: 'Number' },
-  BOOLEAN: { color: '#ed4245', label: 'Boolean' },
-};
+import { DATA_TYPES } from '../constants/dataTypes';
 
 const DataNode = ({ id, data }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleConfigChange = (field, value) => {
+    if (data.onUpdate) {
+      const newConfig = { ...data.config, [field]: value };
+      data.onUpdate(id, newConfig);
+    }
+  };
+
+  const hasConfig = data.config !== undefined;
+
   return (
     <div className="data-node" style={{ borderColor: data.color }}>
       <div className="data-node-header" style={{ background: data.color }}>
         <span className="data-node-icon">{data.icon}</span>
         <span className="data-node-label">{data.label}</span>
+        {hasConfig && (
+          <button
+            className="data-node-expand"
+            onClick={() => setIsExpanded(!isExpanded)}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              marginLeft: 'auto',
+              padding: '2px 6px',
+              borderRadius: '3px',
+              fontSize: '12px'
+            }}
+          >
+            {isExpanded ? '−' : '+'}
+          </button>
+        )}
       </div>
+
+      {isExpanded && hasConfig && (
+        <div className="data-node-config" style={{ padding: '10px', background: '#1e1e1e' }}>
+          {data.nodeType === 'static-boolean' && (
+            <label style={{ display: 'flex', alignItems: 'center', color: '#fff', fontSize: '12px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={data.config.value || false}
+                onChange={(e) => handleConfigChange('value', e.target.checked)}
+                style={{ marginRight: '8px' }}
+              />
+              {data.config.value ? 'True' : 'False'}
+            </label>
+          )}
+
+          {data.nodeType === 'static-number' && (
+            <input
+              type="number"
+              value={data.config.value || 0}
+              onChange={(e) => handleConfigChange('value', parseFloat(e.target.value) || 0)}
+              style={{
+                width: '100%',
+                padding: '6px',
+                background: '#2b2d31',
+                border: '1px solid #383a40',
+                borderRadius: '4px',
+                color: '#fff',
+                fontSize: '12px'
+              }}
+            />
+          )}
+
+          {data.nodeType === 'static-string' && (
+            <textarea
+              value={data.config.value || ''}
+              onChange={(e) => handleConfigChange('value', e.target.value)}
+              placeholder="Enter text..."
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '6px',
+                background: '#2b2d31',
+                border: '1px solid #383a40',
+                borderRadius: '4px',
+                color: '#fff',
+                fontSize: '12px',
+                fontFamily: 'inherit',
+                resize: 'vertical'
+              }}
+            />
+          )}
+        </div>
+      )}
 
       <div className="data-node-body">
         {data.inputs?.map((input, index) => (

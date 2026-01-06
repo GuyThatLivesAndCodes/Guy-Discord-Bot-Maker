@@ -295,8 +295,14 @@ class BotRunner {
     if (startNode.data.actionType === 'branch') {
       // Get the condition value
       const conditionValue = this.getInputValue(flowData, startNode.id, 'condition', dataContext);
-      const outputHandle = conditionValue ? 'true' : 'false';
 
+      // If condition is null or undefined, don't execute either path
+      if (conditionValue === null || conditionValue === undefined) {
+        this.log('info', `Branch node condition is null/undefined, skipping both paths`);
+        return;
+      }
+
+      const outputHandle = conditionValue ? 'true' : 'false';
       this.log('info', `Branch node condition: ${conditionValue}, following ${outputHandle} path`);
 
       // Follow the appropriate output path
@@ -502,6 +508,19 @@ class BotRunner {
     try {
 
     switch (nodeType) {
+      // Static value nodes (constants)
+      case 'static-boolean':
+        output.value = node.data.config?.value || false;
+        break;
+
+      case 'static-number':
+        output.value = node.data.config?.value || 0;
+        break;
+
+      case 'static-string':
+        output.value = node.data.config?.value || '';
+        break;
+
       case 'get-user-name':
         const user = getUserInput('user');
         output.name = user?.username || 'Unknown';

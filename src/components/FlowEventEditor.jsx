@@ -14,22 +14,12 @@ import ActionNodeComponent from './ActionNode';
 import TriggerNodeComponent from './TriggerNode';
 import DataNodeComponent from './DataNode';
 import './FlowEventEditor.css';
+import { DATA_TYPES } from '../constants/dataTypes';
 
 const nodeTypes = {
   actionNode: ActionNodeComponent,
   triggerNode: TriggerNodeComponent,
   dataNode: DataNodeComponent,
-};
-
-// Data types with colors
-export const DATA_TYPES = {
-  FLOW: { color: '#5865f2', label: 'Flow' },
-  USER: { color: '#f23f43', label: 'User' },
-  CHANNEL: { color: '#43b581', label: 'Channel' },
-  GUILD: { color: '#7289da', label: 'Guild' },
-  STRING: { color: '#faa61a', label: 'String' },
-  NUMBER: { color: '#00aff4', label: 'Number' },
-  BOOLEAN: { color: '#ed4245', label: 'Boolean' },
 };
 
 // Trigger node (auto-added for commands)
@@ -42,6 +32,35 @@ const TRIGGER_NODE = {
 
 // Data converter nodes
 const DATA_NODES = [
+  // Static value nodes (constants)
+  {
+    type: 'static-boolean',
+    label: 'Boolean Value',
+    icon: '🔘',
+    color: '#ed4245',
+    inputs: [],
+    outputs: [{ id: 'value', type: 'BOOLEAN' }],
+    config: { value: true },
+  },
+  {
+    type: 'static-number',
+    label: 'Number Value',
+    icon: '🔢',
+    color: '#00aff4',
+    inputs: [],
+    outputs: [{ id: 'value', type: 'NUMBER' }],
+    config: { value: 0 },
+  },
+  {
+    type: 'static-string',
+    label: 'Text Value',
+    icon: '📝',
+    color: '#faa61a',
+    inputs: [],
+    outputs: [{ id: 'value', type: 'STRING' }],
+    config: { value: '' },
+  },
+  // Discord data extractors
   {
     type: 'get-user-name',
     label: 'Get User Name',
@@ -583,6 +602,8 @@ function FlowEventEditor({ event, onSave, onClose }) {
         color: dataNodeType.color,
         inputs: dataNodeType.inputs,
         outputs: dataNodeType.outputs,
+        config: dataNodeType.config ? { ...dataNodeType.config } : undefined,
+        onUpdate: updateNodeData,
       },
     };
     setNodes((nds) => [...nds, newNode]);
@@ -600,6 +621,7 @@ function FlowEventEditor({ event, onSave, onClose }) {
         color: actionType.color,
         config: { ...actionType.defaultData },
         inputs: actionType.inputs || [{ id: 'flow', type: 'FLOW' }],
+        outputs: actionType.outputs, // Pass outputs for branch node
         onUpdate: updateNodeData,
       },
     };
