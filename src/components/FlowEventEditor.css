@@ -148,22 +148,24 @@
 .flow-editor-canvas {
   flex: 1;
   position: relative;
-  background: #1e1e1e;
+  background: #2d2d2d;
 }
 
 .canvas-info {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: rgba(43, 45, 49, 0.95);
-  padding: 12px 15px;
-  border-radius: 8px;
+  background: rgba(26, 26, 26, 0.95);
+  padding: 10px 14px;
+  border-radius: 4px;
+  border: 1px solid #404040;
   display: flex;
-  gap: 20px;
-  font-size: 12px;
-  color: #b5bac1;
+  gap: 15px;
+  font-size: 11px;
+  color: #b0b0b0;
   z-index: 5;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .canvas-info span {
@@ -172,18 +174,43 @@
   gap: 5px;
 }
 
-/* React Flow customization */
+.canvas-info strong {
+  color: #ffffff;
+  font-weight: 600;
+  background: #303030;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 10px;
+  margin: 0 2px;
+}
+
+/* React Flow customization - UE5 Blueprint Style */
 .react-flow {
-  background: #1e1e1e;
+  background-color: #2d2d2d;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size:
+    25px 25px,
+    25px 25px,
+    100px 100px,
+    100px 100px;
+  background-position:
+    0 0,
+    0 0,
+    0 0,
+    0 0;
 }
 
 .react-flow__node {
-  border-radius: 8px;
+  border-radius: 4px;
 }
 
 .react-flow__edge-path {
   stroke: #5865f2;
-  stroke-width: 2;
+  stroke-width: 3;
 }
 
 .react-flow__edge.animated .react-flow__edge-path {
@@ -198,10 +225,11 @@
 }
 
 .react-flow__handle {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   background: #5865f2;
-  border: 2px solid #1e1e1e;
+  border: 2px solid #2d2d2d;
+  border-radius: 50%;
 }
 
 .react-flow__handle:hover {

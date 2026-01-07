@@ -1387,6 +1387,76 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
     [setNodes, setEdges]
   );
 
+  // Keyboard shortcuts (UE5-style)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Get selected nodes
+      const selectedNodes = nodes.filter((node) => node.selected);
+
+      // Delete key - delete selected nodes
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNodes.length > 0 && !e.target.matches('input, textarea')) {
+          e.preventDefault();
+          selectedNodes.forEach((node) => {
+            if (node.id !== 'trigger-node') {
+              deleteNode(node.id);
+            }
+          });
+        }
+      }
+
+      // Ctrl/Cmd + S - save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+
+      // Ctrl/Cmd + F - focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        const searchInput = document.querySelector('.search-input');
+        if (searchInput) searchInput.focus();
+      }
+
+      // Escape - deselect all and clear search
+      if (e.key === 'Escape') {
+        if (searchTerm) {
+          setSearchTerm('');
+        } else {
+          setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+          setSelectedNode(null);
+        }
+      }
+
+      // Ctrl/Cmd + D - duplicate selected node
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedNodes.length === 1) {
+        e.preventDefault();
+        const node = selectedNodes[0];
+        if (node.id !== 'trigger-node') {
+          const newNode = {
+            ...node,
+            id: `${node.type}-${Date.now()}`,
+            position: {
+              x: node.position.x + 50,
+              y: node.position.y + 50,
+            },
+            selected: false,
+          };
+          setNodes((nds) => [...nds, newNode]);
+        }
+      }
+
+      // Ctrl/Cmd + A - select all nodes
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.target.matches('input, textarea')) {
+        e.preventDefault();
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: true })));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, deleteNode, searchTerm, setNodes, setSearchTerm, setSelectedNode]);
+
   const handleSave = () => {
     if (eventConfig.type === 'command' && !eventConfig.name) {
       alert('Please enter a command name');
@@ -1720,9 +1790,10 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
 
         <div className="flow-editor-canvas">
           <div className="canvas-info">
-            <span>📍 Drag nodes to position</span>
-            <span>🔗 Connect colored handles by type</span>
-            <span>🗑️ Select node and press Delete</span>
+            <span>📍 Drag to move • Scroll to zoom • Click handles to connect</span>
+            <span style={{ borderLeft: '1px solid #505050', paddingLeft: '20px', marginLeft: '10px' }}>
+              ⌨️ <strong>Del</strong>: Delete • <strong>Ctrl+S</strong>: Save • <strong>Ctrl+D</strong>: Duplicate • <strong>Ctrl+F</strong>: Search • <strong>Ctrl+A</strong>: Select All
+            </span>
           </div>
           <ReactFlow
             nodes={nodes}
@@ -1734,12 +1805,23 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
             nodeTypes={nodeTypes}
             fitView
             attributionPosition="bottom-right"
+            selectNodesOnDrag={false}
+            selectionOnDrag={true}
+            panOnDrag={[1, 2]}
+            selectionKeyCode="Shift"
+            multiSelectionKeyCode="Control"
+            deleteKeyCode="Delete"
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            panOnScroll={false}
+            elevateNodesOnSelect={true}
           >
-            <Background color="#383a40" gap={16} />
+            <Background color="#505050" gap={25} size={1} />
             <Controls />
             <MiniMap
-              nodeColor={(node) => node.data.color || '#5865f2'}
-              maskColor="rgba(0, 0, 0, 0.6)"
+              nodeColor={(node) => node.data.color || '#1565c0'}
+              maskColor="rgba(0, 0, 0, 0.7)"
+              style={{ background: '#1a1a1a', border: '1px solid #404040' }}
             />
           </ReactFlow>
         </div>
