@@ -1026,14 +1026,18 @@ const ACTION_TYPES = [
   },
 ];
 
-function FlowEventEditor({ event, onSave, onClose }) {
+function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const [eventConfig, setEventConfig] = useState(
     event || {
-      type: 'command',
+      type: eventType || 'command',
       name: '',
       description: '',
+      triggerType: eventType === 'event' ? 'messageCreate' : undefined,
       flowData: { nodes: [], edges: [] },
     }
+  );
+  const [showTriggerSelector, setShowTriggerSelector] = useState(
+    eventType === 'event' && !event
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(eventConfig.flowData?.nodes || []);
@@ -1402,6 +1406,86 @@ function FlowEventEditor({ event, onSave, onClose }) {
     onClose();
   };
 
+  const handleSelectTrigger = (triggerKey) => {
+    setEventConfig({ ...eventConfig, triggerType: triggerKey });
+    setShowTriggerSelector(false);
+  };
+
+  // Trigger type options for event triggers
+  const TRIGGER_OPTIONS = [
+    {
+      key: 'messageCreate',
+      label: 'On Message Sent',
+      icon: '💬',
+      description: 'Triggers when any user sends a message in the server',
+      color: '#5865f2',
+    },
+    {
+      key: 'guildMemberAdd',
+      label: 'On Member Join',
+      icon: '👋',
+      description: 'Triggers when someone joins the server',
+      color: '#57f287',
+    },
+    {
+      key: 'guildMemberRemove',
+      label: 'On Member Leave',
+      icon: '👋',
+      description: 'Triggers when someone leaves the server',
+      color: '#ed4245',
+    },
+    {
+      key: 'messageReactionAdd',
+      label: 'On Reaction Added',
+      icon: '👍',
+      description: 'Triggers when someone reacts to a message',
+      color: '#faa61a',
+    },
+    {
+      key: 'messageDelete',
+      label: 'On Message Deleted',
+      icon: '🗑️',
+      description: 'Triggers when a message is deleted',
+      color: '#ed4245',
+    },
+    {
+      key: 'voiceStateUpdate',
+      label: 'On Voice State Change',
+      icon: '🔊',
+      description: 'Triggers when voice state changes (join/leave/mute)',
+      color: '#9b59b6',
+    },
+  ];
+
+  if (showTriggerSelector) {
+    return (
+      <Modal isOpen={true} onClose={onClose} title="Choose Event Trigger" className="flow-editor-modal">
+        <div className="event-type-selector">
+          <div className="selector-header">
+            <h2>Choose a Trigger Type</h2>
+            <p style={{ color: '#b5bac1', fontSize: '14px', marginTop: '8px' }}>
+              Select what Discord event should trigger your bot's actions
+            </p>
+          </div>
+          <div className="event-types-grid">
+            {TRIGGER_OPTIONS.map((trigger) => (
+              <div
+                key={trigger.key}
+                className="event-type-card"
+                onClick={() => handleSelectTrigger(trigger.key)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="event-type-icon" style={{ fontSize: '48px' }}>{trigger.icon}</div>
+                <h3>{trigger.label}</h3>
+                <p>{trigger.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal isOpen={true} onClose={onClose} title={event ? 'Edit Event' : 'Create New Event'} className="flow-editor-modal">
       <div className="flow-editor-container">
@@ -1420,36 +1504,29 @@ function FlowEventEditor({ event, onSave, onClose }) {
             {eventConfig.type === 'event' && (
               <>
                 <div className="form-group">
-                  <label>Trigger Type *</label>
-                  <select
-                    value={eventConfig.triggerType || 'messageCreate'}
-                    onChange={(e) => setEventConfig({ ...eventConfig, triggerType: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      background: '#2b2d31',
-                      border: '1px solid #383a40',
-                      borderRadius: '4px',
-                      color: '#fff',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <option value="messageCreate">💬 On Message Sent</option>
-                    <option value="guildMemberAdd">👋 On Member Join</option>
-                    <option value="guildMemberRemove">👋 On Member Leave</option>
-                    <option value="messageReactionAdd">👍 On Reaction Added</option>
-                    <option value="messageDelete">🗑️ On Message Deleted</option>
-                    <option value="voiceStateUpdate">🔊 On Voice State Change</option>
-                  </select>
+                  <label>Trigger Type</label>
+                  <div className="event-type-badge" style={{
+                    padding: '12px',
+                    background: '#2b2d31',
+                    borderRadius: '6px',
+                    border: '1px solid #383a40',
+                  }}>
+                    <span className="event-icon" style={{ fontSize: '24px', marginRight: '12px' }}>
+                      {TRIGGER_OPTIONS.find(t => t.key === eventConfig.triggerType)?.icon || '🎯'}
+                    </span>
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>
+                      {TRIGGER_OPTIONS.find(t => t.key === eventConfig.triggerType)?.label || 'Event Trigger'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="form-group">
-                  <label>Description</label>
+                  <label>Description (Optional)</label>
                   <input
                     type="text"
                     value={eventConfig.description || ''}
                     onChange={(e) => setEventConfig({ ...eventConfig, description: e.target.value })}
-                    placeholder="Event description"
+                    placeholder="Describe what this event does..."
                   />
                 </div>
               </>

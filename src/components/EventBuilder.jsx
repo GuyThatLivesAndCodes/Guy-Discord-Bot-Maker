@@ -24,6 +24,7 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [showFlowEditor, setShowFlowEditor] = useState(false);
   const [showEventTypeSelector, setShowEventTypeSelector] = useState(false);
+  const [selectedEventType, setSelectedEventType] = useState(null);
 
   const handleSave = (event) => {
     if (editingIndex !== null) {
@@ -33,18 +34,21 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
       onAddEvent(event);
     }
     setShowFlowEditor(false);
+    setSelectedEventType(null);
   };
 
   const handleClose = () => {
     setEditingIndex(null);
     setShowFlowEditor(false);
     setShowEventTypeSelector(false);
+    setSelectedEventType(null);
   };
 
   const handleSelectEventType = (eventType) => {
     if (!eventType.available) {
       return;
     }
+    setSelectedEventType(eventType.type);
     setShowEventTypeSelector(false);
     setShowFlowEditor(true);
   };
@@ -86,6 +90,7 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
       {showFlowEditor && (
         <FlowEventEditor
           event={editingIndex !== null ? events[editingIndex] : null}
+          eventType={editingIndex !== null ? events[editingIndex].type : selectedEventType}
           onSave={handleSave}
           onClose={handleClose}
         />
