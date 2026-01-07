@@ -527,8 +527,8 @@ class BotRunner {
       return;
     }
 
-    // Execute flow starting from trigger node
-    await this.executeNode(flowData, triggerNode, dataContext, null);
+    // Execute flow starting from trigger node (no interaction for event triggers)
+    await this.executeNode(null, flowData, triggerNode, dataContext);
   }
 
   async executeCommand(interaction, command) {
@@ -801,7 +801,7 @@ class BotRunner {
 
         const messageOptions = {
           content: messageContent,
-          ephemeral: config.ephemeral || false
+          ephemeral: interaction ? (config.ephemeral || false) : undefined
         };
 
         // Check for connected file attachment
@@ -819,10 +819,21 @@ class BotRunner {
           }
         }
 
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply(messageOptions);
+        // For commands: use interaction.reply
+        // For event triggers: use channel.send
+        if (interaction) {
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply(messageOptions);
+          } else {
+            await interaction.followUp(messageOptions);
+          }
         } else {
-          await interaction.followUp(messageOptions);
+          // Event trigger - send to channel from context
+          const channel = dataContext.channel;
+          if (!channel) {
+            throw new Error('No channel available for sending message');
+          }
+          await channel.send(messageOptions);
         }
         break;
 
