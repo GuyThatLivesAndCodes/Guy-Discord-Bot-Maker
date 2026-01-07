@@ -24,7 +24,9 @@
       "dist/**/*"
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.ico"
     },
     "nsis": {
@@ -32,16 +34,25 @@
       "allowToChangeInstallationDirectory": true
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "build/icon.icns"
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "icon": "build/icon.png",
       "category": "Development"
     }
   },
-  "keywords": ["discord", "bot", "maker", "electron"],
+  "keywords": [
+    "discord",
+    "bot",
+    "maker",
+    "electron"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
