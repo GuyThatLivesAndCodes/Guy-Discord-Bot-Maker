@@ -4,19 +4,20 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 
-// Try to load @discordjs/voice, handle if not installed
+// Configure FFmpeg BEFORE loading @discordjs/voice
+let ffmpegPath = null;
+try {
+  ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+  process.env.FFMPEG_PATH = ffmpegPath;
+  console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
+} catch (ffmpegError) {
+  console.warn('[Voice] @ffmpeg-installer/ffmpeg not installed. Voice streaming may not work. Run: npm install @ffmpeg-installer/ffmpeg');
+}
+
+// Try to load @discordjs/voice AFTER setting FFmpeg path
 let voiceModule = null;
 try {
   voiceModule = require('@discordjs/voice');
-
-  // Configure FFmpeg path for voice streaming
-  try {
-    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-    process.env.FFMPEG_PATH = ffmpegPath;
-    console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
-  } catch (ffmpegError) {
-    console.warn('[Voice] @ffmpeg-installer/ffmpeg not installed. Voice streaming may not work. Run: npm install @ffmpeg-installer/ffmpeg');
-  }
 } catch (error) {
   console.warn('[@discordjs/voice] not installed. Voice features will be disabled. Run: npm install @discordjs/voice');
 }
@@ -1229,6 +1230,11 @@ class BotRunner {
             throw new Error('No file specified. Connect a file or filename.');
           }
 
+          // Verify FFmpeg is available
+          if (!ffmpegPath) {
+            throw new Error('FFmpeg not found. Please install: npm install @ffmpeg-installer/ffmpeg');
+          }
+
           // Stop any currently playing audio
           let player = this.audioPlayers.get(interaction.guild.id);
           if (player) {
@@ -1239,7 +1245,13 @@ class BotRunner {
           }
 
           // Create audio resource from file
-          const resource = createAudioResource(filePath);
+          // FFmpeg path is already set in process.env.FFMPEG_PATH
+          const resource = createAudioResource(filePath, {
+            inlineVolume: true,
+            metadata: {
+              title: path.basename(filePath)
+            }
+          });
 
           // Subscribe connection to player
           voiceConnection.subscribe(player);
