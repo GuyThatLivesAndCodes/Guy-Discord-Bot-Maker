@@ -4,6 +4,14 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 
+// Try to load @discordjs/voice, handle if not installed
+let voiceModule = null;
+try {
+  voiceModule = require('@discordjs/voice');
+} catch (error) {
+  console.warn('[@discordjs/voice] not installed. Voice features will be disabled. Run: npm install @discordjs/voice');
+}
+
 class BotRunner {
   constructor(botId, config, logCallback) {
     this.botId = botId;
@@ -11,6 +19,7 @@ class BotRunner {
     this.logCallback = logCallback;
     this.client = null;
     this.isRunning = false;
+    this.voiceConnections = new Map(); // Store voice connections per guild
 
     // Initialize storage directories
     this.storagePath = path.join(process.cwd(), 'bot-storage', this.botId);
@@ -862,22 +871,67 @@ class BotRunner {
         break;
 
       case 'join-voice':
-        const voiceChannel = this.getInputValue(flowData, node.id, 'channel', dataContext) || config.channelId;
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
 
-        // Note: Requires @discordjs/voice package for full implementation
-        this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
-        throw new Error('Voice join not implemented - requires @discordjs/voice package');
-        // Basic implementation would be:
-        // const { joinVoiceChannel } = require('@discordjs/voice');
-        // const connection = joinVoiceChannel({ ... });
+        const voiceChannel = this.getInputValue(flowData, node.id, 'channel', dataContext);
+
+        if (!voiceChannel) {
+          throw new Error('No voice channel specified');
+        }
+
+        if (!voiceChannel.isVoiceBased()) {
+          throw new Error(`${voiceChannel.name} is not a voice channel`);
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot join voice channel outside of a guild');
+        }
+
+        try {
+          const { joinVoiceChannel } = voiceModule;
+
+          // Check if already connected to this guild
+          const existingConnection = this.voiceConnections.get(interaction.guild.id);
+          if (existingConnection) {
+            existingConnection.destroy();
+          }
+
+          const connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: interaction.guild.id,
+            adapterCreator: interaction.guild.voiceAdapterCreator,
+          });
+
+          this.voiceConnections.set(interaction.guild.id, connection);
+          this.log('success', `Joined voice channel: ${voiceChannel.name}`);
+        } catch (error) {
+          throw new Error(`Failed to join voice channel: ${error.message}`);
+        }
         break;
 
       case 'leave-voice':
-        // Note: Requires @discordjs/voice package for full implementation
-        this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
-        throw new Error('Voice leave not implemented - requires @discordjs/voice package');
-        // Basic implementation would be:
-        // connection.destroy();
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot leave voice channel outside of a guild');
+        }
+
+        const connection = this.voiceConnections.get(interaction.guild.id);
+        if (!connection) {
+          throw new Error('Not connected to any voice channel in this server');
+        }
+
+        try {
+          connection.destroy();
+          this.voiceConnections.delete(interaction.guild.id);
+          this.log('success', 'Left voice channel');
+        } catch (error) {
+          throw new Error(`Failed to leave voice channel: ${error.message}`);
+        }
         break;
 
       // File operations
@@ -1296,6 +1350,20 @@ class BotRunner {
   stop() {
     if (this.client) {
       this.log('info', 'Stopping bot...');
+
+      // Disconnect from all voice channels
+      if (this.voiceConnections.size > 0) {
+        this.log('info', `Disconnecting from ${this.voiceConnections.size} voice channels...`);
+        for (const [guildId, connection] of this.voiceConnections) {
+          try {
+            connection.destroy();
+          } catch (error) {
+            this.log('error', `Failed to disconnect from voice in guild ${guildId}: ${error.message}`);
+          }
+        }
+        this.voiceConnections.clear();
+      }
+
       this.client.destroy();
       this.client = null;
       this.isRunning = false;
