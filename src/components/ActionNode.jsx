@@ -488,6 +488,74 @@ const ActionNode = ({ id, data }) => {
               </p>
             </div>
           )}
+
+          {data.actionType === 'save-file-to-server' && (
+            <>
+              <div className="config-field">
+                <label>Filename</label>
+                <input
+                  type="text"
+                  value={data.config.filename || ''}
+                  onChange={(e) => handleConfigChange('filename', e.target.value)}
+                  placeholder="file.txt"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Connect STRING inputs to set filename and content dynamically
+                </small>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'save-attachment-to-server' && (
+            <div className="config-field">
+              <label>Filename (optional)</label>
+              <input
+                type="text"
+                value={data.config.filename || ''}
+                onChange={(e) => handleConfigChange('filename', e.target.value)}
+                placeholder="Leave empty to use original filename"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                💡 Connect ATTACHMENT input to save uploaded file
+              </small>
+            </div>
+          )}
+
+          {(data.actionType === 'set-variable-global' ||
+            data.actionType === 'set-variable-server' ||
+            data.actionType === 'set-variable-user') && (
+            <>
+              <div className="config-field">
+                <label>Variable Key</label>
+                <input
+                  type="text"
+                  value={data.config.key || ''}
+                  onChange={(e) => handleConfigChange('key', e.target.value)}
+                  placeholder="myVariable"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Value</label>
+                <input
+                  type="text"
+                  value={data.config.value || ''}
+                  onChange={(e) => handleConfigChange('value', e.target.value)}
+                  placeholder="value"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Connect STRING inputs to set key and value dynamically
+                </small>
+              </div>
+            </>
+          )}
         </div>
       )}
 

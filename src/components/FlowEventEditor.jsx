@@ -404,6 +404,86 @@ const DATA_NODES = [
     outputs: [{ id: 'timestamp', type: 'NUMBER' }],
     tags: ['time', 'now', 'current', 'timestamp', 'unix', 'date'],
   },
+  // File operation nodes
+  {
+    type: 'get-file-name',
+    label: 'Get File Name',
+    icon: '📄',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'name', type: 'STRING' }],
+    tags: ['file', 'attachment', 'name', 'filename', 'upload'],
+  },
+  {
+    type: 'get-file-url',
+    label: 'Get File URL',
+    icon: '🔗',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'url', type: 'STRING' }],
+    tags: ['file', 'attachment', 'url', 'link', 'download'],
+  },
+  {
+    type: 'get-file-size',
+    label: 'Get File Size',
+    icon: '📊',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'size', type: 'NUMBER' }],
+    tags: ['file', 'attachment', 'size', 'bytes', 'length'],
+  },
+  {
+    type: 'read-file-from-url',
+    label: 'Read File from URL',
+    icon: '🌐',
+    color: '#9b59b6',
+    inputs: [{ id: 'url', type: 'STRING' }],
+    outputs: [{ id: 'content', type: 'STRING' }],
+    tags: ['file', 'read', 'url', 'http', 'download', 'fetch', 'web'],
+  },
+  {
+    type: 'read-file-from-server',
+    label: 'Read File from Server',
+    icon: '💾',
+    color: '#9b59b6',
+    inputs: [{ id: 'filename', type: 'STRING' }],
+    outputs: [{ id: 'content', type: 'STRING' }],
+    tags: ['file', 'read', 'server', 'storage', 'load', 'disk'],
+  },
+  // Variable nodes - Get
+  {
+    type: 'get-variable-global',
+    label: 'Get Variable (Global)',
+    icon: '🌍',
+    color: '#e67e22',
+    inputs: [{ id: 'key', type: 'STRING' }],
+    outputs: [{ id: 'value', type: 'STRING' }],
+    tags: ['variable', 'get', 'load', 'global', 'storage', 'data', 'retrieve'],
+  },
+  {
+    type: 'get-variable-server',
+    label: 'Get Variable (Server)',
+    icon: '🏰',
+    color: '#e67e22',
+    inputs: [
+      { id: 'guild', type: 'GUILD' },
+      { id: 'key', type: 'STRING' },
+    ],
+    outputs: [{ id: 'value', type: 'STRING' }],
+    tags: ['variable', 'get', 'load', 'server', 'guild', 'storage', 'data', 'retrieve'],
+  },
+  {
+    type: 'get-variable-user',
+    label: 'Get Variable (User)',
+    icon: '👤',
+    color: '#e67e22',
+    inputs: [
+      { id: 'user', type: 'USER' },
+      { id: 'key', type: 'STRING' },
+    ],
+    outputs: [{ id: 'value', type: 'STRING' }],
+    tags: ['variable', 'get', 'load', 'user', 'member', 'storage', 'data', 'retrieve', 'player'],
+  },
 ];
 
 // Action types available
@@ -721,6 +801,95 @@ const ACTION_TYPES = [
       { id: 'false', type: 'FLOW', label: 'False' },
     ],
     tags: ['branch', 'if', 'condition', 'check', 'conditional', 'split', 'decision'],
+  },
+  // File operation actions
+  {
+    type: 'save-file-to-server',
+    label: 'Save File to Server',
+    icon: '💾',
+    color: '#9b59b6',
+    defaultData: { filename: 'file.txt' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'filename', type: 'STRING', optional: true },
+      { id: 'content', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'save', 'write', 'server', 'storage', 'disk', 'upload'],
+  },
+  {
+    type: 'save-attachment-to-server',
+    label: 'Save Attachment to Server',
+    icon: '📥',
+    color: '#9b59b6',
+    defaultData: { filename: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'file', type: 'ATTACHMENT' },
+      { id: 'filename', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'save', 'download', 'attachment', 'server', 'storage', 'disk'],
+  },
+  // Variable operation actions
+  {
+    type: 'set-variable-global',
+    label: 'Set Variable (Global)',
+    icon: '🌍',
+    color: '#e67e22',
+    defaultData: { key: '', value: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'key', type: 'STRING', optional: true },
+      { id: 'value', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['variable', 'set', 'save', 'global', 'storage', 'data', 'store', 'write'],
+  },
+  {
+    type: 'set-variable-server',
+    label: 'Set Variable (Server)',
+    icon: '🏰',
+    color: '#e67e22',
+    defaultData: { key: '', value: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'guild', type: 'GUILD', optional: true },
+      { id: 'key', type: 'STRING', optional: true },
+      { id: 'value', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['variable', 'set', 'save', 'server', 'guild', 'storage', 'data', 'store', 'write'],
+  },
+  {
+    type: 'set-variable-user',
+    label: 'Set Variable (User)',
+    icon: '👤',
+    color: '#e67e22',
+    defaultData: { key: '', value: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'user', type: 'USER', optional: true },
+      { id: 'key', type: 'STRING', optional: true },
+      { id: 'value', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['variable', 'set', 'save', 'user', 'member', 'storage', 'data', 'store', 'write', 'player', 'money', 'balance'],
   },
 ];
 
@@ -1134,6 +1303,7 @@ function FlowEventEditor({ event, onSave, onClose }) {
                           <option value="USER">User</option>
                           <option value="CHANNEL">Channel</option>
                           <option value="ROLE">Role</option>
+                          <option value="ATTACHMENT">File</option>
                         </select>
                         <label style={{ marginRight: '8px', fontSize: '12px', display: 'flex', alignItems: 'center' }}>
                           <input

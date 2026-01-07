@@ -1,4 +1,8 @@
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const http = require('http');
 
 class BotRunner {
   constructor(botId, config, logCallback) {
@@ -7,6 +11,131 @@ class BotRunner {
     this.logCallback = logCallback;
     this.client = null;
     this.isRunning = false;
+
+    // Initialize storage directories
+    this.storagePath = path.join(process.cwd(), 'bot-storage', this.botId);
+    this.filesPath = path.join(this.storagePath, 'files');
+    this.variablesPath = path.join(this.storagePath, 'variables');
+    this.ensureStorageDirectories();
+  }
+
+  ensureStorageDirectories() {
+    try {
+      if (!fs.existsSync(this.storagePath)) {
+        fs.mkdirSync(this.storagePath, { recursive: true });
+      }
+      if (!fs.existsSync(this.filesPath)) {
+        fs.mkdirSync(this.filesPath, { recursive: true });
+      }
+      if (!fs.existsSync(this.variablesPath)) {
+        fs.mkdirSync(this.variablesPath, { recursive: true });
+      }
+    } catch (error) {
+      this.log('error', `Failed to create storage directories: ${error.message}`);
+    }
+  }
+
+  // Variable storage methods
+  async setVariable(scope, scopeId, key, value) {
+    try {
+      const filename = scope === 'global'
+        ? path.join(this.variablesPath, 'global.json')
+        : path.join(this.variablesPath, `${scope}-${scopeId}.json`);
+
+      let data = {};
+      if (fs.existsSync(filename)) {
+        const fileContent = fs.readFileSync(filename, 'utf8');
+        data = JSON.parse(fileContent);
+      }
+
+      data[key] = value;
+      fs.writeFileSync(filename, JSON.stringify(data, null, 2));
+      return true;
+    } catch (error) {
+      this.log('error', `Failed to set variable: ${error.message}`);
+      return false;
+    }
+  }
+
+  async getVariable(scope, scopeId, key) {
+    try {
+      const filename = scope === 'global'
+        ? path.join(this.variablesPath, 'global.json')
+        : path.join(this.variablesPath, `${scope}-${scopeId}.json`);
+
+      if (!fs.existsSync(filename)) {
+        return '';
+      }
+
+      const fileContent = fs.readFileSync(filename, 'utf8');
+      const data = JSON.parse(fileContent);
+      return data[key] || '';
+    } catch (error) {
+      this.log('error', `Failed to get variable: ${error.message}`);
+      return '';
+    }
+  }
+
+  // File operations
+  async saveFileToServer(filename, content) {
+    try {
+      const filepath = path.join(this.filesPath, filename);
+      fs.writeFileSync(filepath, content);
+      return true;
+    } catch (error) {
+      this.log('error', `Failed to save file: ${error.message}`);
+      return false;
+    }
+  }
+
+  async readFileFromServer(filename) {
+    try {
+      const filepath = path.join(this.filesPath, filename);
+      if (!fs.existsSync(filepath)) {
+        return '';
+      }
+      return fs.readFileSync(filepath, 'utf8');
+    } catch (error) {
+      this.log('error', `Failed to read file: ${error.message}`);
+      return '';
+    }
+  }
+
+  async downloadFile(url, filename) {
+    return new Promise((resolve, reject) => {
+      const filepath = path.join(this.filesPath, filename);
+      const file = fs.createWriteStream(filepath);
+      const protocol = url.startsWith('https') ? https : http;
+
+      protocol.get(url, (response) => {
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          resolve(true);
+        });
+      }).on('error', (err) => {
+        fs.unlink(filepath, () => {});
+        reject(err);
+      });
+    });
+  }
+
+  async readFileFromURL(url) {
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https') ? https : http;
+
+      protocol.get(url, (response) => {
+        let data = '';
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        response.on('end', () => {
+          resolve(data);
+        });
+      }).on('error', (err) => {
+        reject(err);
+      });
+    });
   }
 
   log(type, message) {
@@ -138,6 +267,7 @@ class BotRunner {
             'USER': 6,
             'CHANNEL': 7,
             'ROLE': 8,
+            'ATTACHMENT': 11,
           };
 
           option.type = typeMap[opt.type] || 3; // Default to STRING
@@ -250,6 +380,8 @@ class BotRunner {
               dataContext[`option-${opt.name}`] = value.channel;
             } else if (opt.type === 'ROLE') {
               dataContext[`option-${opt.name}`] = value.role;
+            } else if (opt.type === 'ATTACHMENT') {
+              dataContext[`option-${opt.name}`] = value.attachment;
             } else {
               dataContext[`option-${opt.name}`] = value.value;
             }
@@ -748,6 +880,88 @@ class BotRunner {
         // connection.destroy();
         break;
 
+      // File operations
+      case 'save-file-to-server':
+        const saveFilename = this.getInputValue(flowData, node.id, 'filename', dataContext) || config.filename || 'file.txt';
+        const saveContent = this.getInputValue(flowData, node.id, 'content', dataContext) || '';
+
+        const saveSuccess = await this.saveFileToServer(saveFilename, saveContent);
+        if (!saveSuccess) {
+          throw new Error('Failed to save file to server');
+        }
+        this.log('success', `Saved file: ${saveFilename}`);
+        break;
+
+      case 'save-attachment-to-server':
+        const attachment = this.getInputValue(flowData, node.id, 'file', dataContext);
+        const attachmentFilename = this.getInputValue(flowData, node.id, 'filename', dataContext) || config.filename || attachment?.name || 'file.dat';
+
+        if (!attachment) {
+          throw new Error('No attachment provided');
+        }
+
+        try {
+          await this.downloadFile(attachment.url, attachmentFilename);
+          this.log('success', `Saved attachment: ${attachmentFilename}`);
+        } catch (error) {
+          throw new Error(`Failed to save attachment: ${error.message}`);
+        }
+        break;
+
+      // Variable operations
+      case 'set-variable-global':
+        const globalKey = this.getInputValue(flowData, node.id, 'key', dataContext) || config.key || '';
+        const globalValue = this.getInputValue(flowData, node.id, 'value', dataContext) || config.value || '';
+
+        if (!globalKey) {
+          throw new Error('Variable key is required');
+        }
+
+        const globalSetSuccess = await this.setVariable('global', null, globalKey, globalValue);
+        if (!globalSetSuccess) {
+          throw new Error('Failed to set global variable');
+        }
+        this.log('success', `Set global variable: ${globalKey} = ${globalValue}`);
+        break;
+
+      case 'set-variable-server':
+        const serverGuild = this.getInputValue(flowData, node.id, 'guild', dataContext) || interaction.guild;
+        const serverKey = this.getInputValue(flowData, node.id, 'key', dataContext) || config.key || '';
+        const serverValue = this.getInputValue(flowData, node.id, 'value', dataContext) || config.value || '';
+
+        if (!serverKey) {
+          throw new Error('Variable key is required');
+        }
+        if (!serverGuild) {
+          throw new Error('Guild context is required');
+        }
+
+        const serverSetSuccess = await this.setVariable('server', serverGuild.id, serverKey, serverValue);
+        if (!serverSetSuccess) {
+          throw new Error('Failed to set server variable');
+        }
+        this.log('success', `Set server variable: ${serverKey} = ${serverValue} (Server: ${serverGuild.name})`);
+        break;
+
+      case 'set-variable-user':
+        const userForVar = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.user;
+        const userKey = this.getInputValue(flowData, node.id, 'key', dataContext) || config.key || '';
+        const userValue = this.getInputValue(flowData, node.id, 'value', dataContext) || config.value || '';
+
+        if (!userKey) {
+          throw new Error('Variable key is required');
+        }
+        if (!userForVar) {
+          throw new Error('User context is required');
+        }
+
+        const userSetSuccess = await this.setVariable('user', userForVar.id, userKey, userValue);
+        if (!userSetSuccess) {
+          throw new Error('Failed to set user variable');
+        }
+        this.log('success', `Set user variable: ${userKey} = ${userValue} (User: ${userForVar.tag || userForVar.id})`);
+        break;
+
       default:
         this.log('warning', `Unknown action type: ${actionType}`);
         break;
@@ -994,6 +1208,76 @@ class BotRunner {
 
       case 'current-timestamp':
         output.timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
+        break;
+
+      // File operation data nodes
+      case 'get-file-name':
+        const fileForName = getUserInput('file');
+        output.name = fileForName?.name || '';
+        break;
+
+      case 'get-file-url':
+        const fileForUrl = getUserInput('file');
+        output.url = fileForUrl?.url || '';
+        break;
+
+      case 'get-file-size':
+        const fileForSize = getUserInput('file');
+        output.size = fileForSize?.size || 0;
+        break;
+
+      case 'read-file-from-url':
+        const fileUrl = getUserInput('url');
+        if (fileUrl) {
+          try {
+            const fileContent = await this.readFileFromURL(fileUrl);
+            output.content = fileContent;
+          } catch (error) {
+            this.log('error', `Failed to read file from URL: ${error.message}`);
+            output.content = '';
+          }
+        } else {
+          output.content = '';
+        }
+        break;
+
+      case 'read-file-from-server':
+        const filename = getUserInput('filename');
+        if (filename) {
+          output.content = await this.readFileFromServer(filename);
+        } else {
+          output.content = '';
+        }
+        break;
+
+      // Variable data nodes
+      case 'get-variable-global':
+        const globalVarKey = getUserInput('key');
+        if (globalVarKey) {
+          output.value = await this.getVariable('global', null, globalVarKey);
+        } else {
+          output.value = '';
+        }
+        break;
+
+      case 'get-variable-server':
+        const serverVarGuild = getUserInput('guild');
+        const serverVarKey = getUserInput('key');
+        if (serverVarGuild && serverVarKey) {
+          output.value = await this.getVariable('server', serverVarGuild.id, serverVarKey);
+        } else {
+          output.value = '';
+        }
+        break;
+
+      case 'get-variable-user':
+        const userVarUser = getUserInput('user');
+        const userVarKey = getUserInput('key');
+        if (userVarUser && userVarKey) {
+          output.value = await this.getVariable('user', userVarUser.id, userVarKey);
+        } else {
+          output.value = '';
+        }
         break;
 
       default:
