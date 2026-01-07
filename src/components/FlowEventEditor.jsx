@@ -1066,6 +1066,27 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const filteredDataNodes = filterNodes(DATA_NODES);
   const filteredActionNodes = filterNodes(ACTION_TYPES);
 
+  // Define updateNodeData before it's used in useEffects
+  const updateNodeData = useCallback(
+    (nodeId, newConfig) => {
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id === nodeId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                config: newConfig,
+              },
+            };
+          }
+          return node;
+        })
+      );
+    },
+    [setNodes]
+  );
+
   // Auto-add trigger node if it doesn't exist
   useEffect(() => {
     if (nodes.length === 0 || !nodes.find(n => n.type === 'triggerNode')) {
@@ -1383,26 +1404,6 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
     };
     setNodes((nds) => [...nds, newNode]);
   };
-
-  const updateNodeData = useCallback(
-    (nodeId, newConfig) => {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === nodeId) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                config: newConfig,
-              },
-            };
-          }
-          return node;
-        })
-      );
-    },
-    [setNodes]
-  );
 
   const deleteNode = useCallback(
     (nodeId) => {
