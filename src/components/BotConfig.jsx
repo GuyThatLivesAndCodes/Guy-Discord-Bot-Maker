@@ -1,8 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './BotConfig.css';
 
 function BotConfig({ config, onConfigChange, isRunning }) {
   const [localConfig, setLocalConfig] = useState(config);
+
+  // Sync local state when the config prop changes
+  useEffect(() => {
+    setLocalConfig(config);
+  }, [config]);
 
   const handleChange = (field, value) => {
     const newConfig = { ...localConfig, [field]: value };

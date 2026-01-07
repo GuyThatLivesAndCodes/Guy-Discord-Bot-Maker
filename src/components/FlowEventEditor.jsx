@@ -1046,6 +1046,19 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const [loopWarning, setLoopWarning] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const hasAttachedCallbacks = useRef(false);
+  const hasSyncedEvent = useRef(false);
+
+  // Sync eventConfig when the event prop changes (when reopening saved events)
+  useEffect(() => {
+    if (event && !hasSyncedEvent.current) {
+      hasSyncedEvent.current = true;
+      setEventConfig(event);
+      if (event.flowData) {
+        setNodes(event.flowData.nodes || []);
+        setEdges(event.flowData.edges || []);
+      }
+    }
+  }, [event, setNodes, setEdges]);
 
   // Filter nodes based on search term
   const filterNodes = (nodes) => {
