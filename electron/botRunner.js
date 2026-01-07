@@ -575,21 +575,13 @@ class BotRunner {
           dmContent = connectedDmContent;
         }
 
-        try {
-          await dmUser.send(dmContent);
-          this.log('success', `Sent DM to ${dmUser.tag}`);
-        } catch (error) {
-          this.log('error', `Failed to send DM: ${error.message}`);
-        }
+        await dmUser.send(dmContent);
+        this.log('success', `Sent DM to ${dmUser.tag}`);
         break;
 
       case 'react-emoji':
-        try {
-          await interaction.react(config.emoji || '👍');
-          this.log('success', `Reacted with ${config.emoji}`);
-        } catch (error) {
-          this.log('error', `Failed to react: ${error.message}`);
-        }
+        await interaction.react(config.emoji || '👍');
+        this.log('success', `Reacted with ${config.emoji}`);
         break;
 
       case 'branch':
@@ -602,160 +594,158 @@ class BotRunner {
         const duration = this.getInputValue(flowData, node.id, 'duration', dataContext) || config.duration || 60;
         const timeoutReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
 
-        try {
-          if (timeoutUser && timeoutUser.moderatable) {
-            const durationMs = duration * 1000; // Convert seconds to milliseconds
-            await timeoutUser.timeout(durationMs, timeoutReason);
-            this.log('success', `Timed out ${timeoutUser.user?.tag || 'user'} for ${duration}s`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to timeout member: ${error.message}`);
+        if (!timeoutUser) {
+          throw new Error('No user specified for timeout');
         }
+        if (!timeoutUser.moderatable) {
+          throw new Error(`Cannot timeout ${timeoutUser.user?.tag || 'user'} - user has higher or equal role`);
+        }
+
+        const durationMs = duration * 1000; // Convert seconds to milliseconds
+        await timeoutUser.timeout(durationMs, timeoutReason);
+        this.log('success', `Timed out ${timeoutUser.user?.tag || 'user'} for ${duration}s`);
         break;
 
       case 'kick-member':
         const kickUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
         const kickReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
 
-        try {
-          if (kickUser && kickUser.kickable) {
-            await kickUser.kick(kickReason);
-            this.log('success', `Kicked ${kickUser.user?.tag || 'user'}`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to kick member: ${error.message}`);
+        if (!kickUser) {
+          throw new Error('No user specified for kick');
         }
+        if (!kickUser.kickable) {
+          throw new Error(`Cannot kick ${kickUser.user?.tag || 'user'} - user has higher or equal role`);
+        }
+
+        await kickUser.kick(kickReason);
+        this.log('success', `Kicked ${kickUser.user?.tag || 'user'}`);
         break;
 
       case 'ban-member':
         const banUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
         const banReason = this.getInputValue(flowData, node.id, 'reason', dataContext) || config.reason || 'No reason provided';
 
-        try {
-          if (banUser && banUser.bannable) {
-            await banUser.ban({ reason: banReason, deleteMessageDays: 0 });
-            this.log('success', `Banned ${banUser.user?.tag || 'user'}`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to ban member: ${error.message}`);
+        if (!banUser) {
+          throw new Error('No user specified for ban');
         }
+        if (!banUser.bannable) {
+          throw new Error(`Cannot ban ${banUser.user?.tag || 'user'} - user has higher or equal role`);
+        }
+
+        await banUser.ban({ reason: banReason, deleteMessageDays: 0 });
+        this.log('success', `Banned ${banUser.user?.tag || 'user'}`);
         break;
 
       case 'unban-member':
         const unbanUserId = this.getInputValue(flowData, node.id, 'userId', dataContext) || config.userId || '';
 
-        try {
-          if (unbanUserId && interaction.guild) {
-            await interaction.guild.members.unban(unbanUserId);
-            this.log('success', `Unbanned user ${unbanUserId}`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to unban user: ${error.message}`);
+        if (!unbanUserId) {
+          throw new Error('No user ID specified for unban');
         }
+        if (!interaction.guild) {
+          throw new Error('Cannot unban - no guild context');
+        }
+
+        await interaction.guild.members.unban(unbanUserId);
+        this.log('success', `Unbanned user ${unbanUserId}`);
         break;
 
       case 'move-member-voice':
         const moveUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
         const targetChannel = this.getInputValue(flowData, node.id, 'channel', dataContext);
 
-        try {
-          if (moveUser && targetChannel && moveUser.voice?.channel) {
-            await moveUser.voice.setChannel(targetChannel);
-            this.log('success', `Moved ${moveUser.user?.tag} to ${targetChannel.name}`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to move member: ${error.message}`);
+        if (!moveUser) {
+          throw new Error('No user specified for voice move');
         }
+        if (!targetChannel) {
+          throw new Error('No target channel specified');
+        }
+        if (!moveUser.voice?.channel) {
+          throw new Error(`${moveUser.user?.tag || 'User'} is not in a voice channel`);
+        }
+
+        await moveUser.voice.setChannel(targetChannel);
+        this.log('success', `Moved ${moveUser.user?.tag} to ${targetChannel.name}`);
         break;
 
       case 'mute-member-voice':
         const muteUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
 
-        try {
-          if (muteUser && muteUser.voice?.channel) {
-            await muteUser.voice.setMute(true);
-            this.log('success', `Voice muted ${muteUser.user?.tag}`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to mute member: ${error.message}`);
+        if (!muteUser) {
+          throw new Error('No user specified for voice mute');
         }
+        if (!muteUser.voice?.channel) {
+          throw new Error(`${muteUser.user?.tag || 'User'} is not in a voice channel`);
+        }
+
+        await muteUser.voice.setMute(true);
+        this.log('success', `Voice muted ${muteUser.user?.tag}`);
         break;
 
       case 'deafen-member-voice':
         const deafenUser = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.member;
 
-        try {
-          if (deafenUser && deafenUser.voice?.channel) {
-            await deafenUser.voice.setDeaf(true);
-            this.log('success', `Voice deafened ${deafenUser.user?.tag}`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to deafen member: ${error.message}`);
+        if (!deafenUser) {
+          throw new Error('No user specified for voice deafen');
         }
+        if (!deafenUser.voice?.channel) {
+          throw new Error(`${deafenUser.user?.tag || 'User'} is not in a voice channel`);
+        }
+
+        await deafenUser.voice.setDeaf(true);
+        this.log('success', `Voice deafened ${deafenUser.user?.tag}`);
         break;
 
       case 'delete-message':
-        try {
-          if (interaction.message) {
-            await interaction.message.delete();
-            this.log('success', 'Deleted message');
-          }
-        } catch (error) {
-          this.log('error', `Failed to delete message: ${error.message}`);
+        if (!interaction.message) {
+          throw new Error('No message to delete');
         }
+
+        await interaction.message.delete();
+        this.log('success', 'Deleted message');
         break;
 
       case 'pin-message':
-        try {
-          if (interaction.message) {
-            await interaction.message.pin();
-            this.log('success', 'Pinned message');
-          }
-        } catch (error) {
-          this.log('error', `Failed to pin message: ${error.message}`);
+        if (!interaction.message) {
+          throw new Error('No message to pin');
         }
+
+        await interaction.message.pin();
+        this.log('success', 'Pinned message');
         break;
 
       case 'create-thread':
         const threadName = this.getInputValue(flowData, node.id, 'name', dataContext) || config.name || 'New Thread';
 
-        try {
-          if (interaction.channel?.threads) {
-            const thread = await interaction.channel.threads.create({
-              name: threadName,
-              autoArchiveDuration: 60,
-              reason: 'Created via bot command',
-            });
-            this.log('success', `Created thread: ${threadName}`);
-          }
-        } catch (error) {
-          this.log('error', `Failed to create thread: ${error.message}`);
+        if (!interaction.channel?.threads) {
+          throw new Error('This channel does not support threads');
         }
+
+        const thread = await interaction.channel.threads.create({
+          name: threadName,
+          autoArchiveDuration: 60,
+          reason: 'Created via bot command',
+        });
+        this.log('success', `Created thread: ${threadName}`);
         break;
 
       case 'join-voice':
         const voiceChannel = this.getInputValue(flowData, node.id, 'channel', dataContext) || config.channelId;
 
-        try {
-          // Note: Requires @discordjs/voice package for full implementation
-          this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
-          // Basic implementation would be:
-          // const { joinVoiceChannel } = require('@discordjs/voice');
-          // const connection = joinVoiceChannel({ ... });
-        } catch (error) {
-          this.log('error', `Failed to join voice channel: ${error.message}`);
-        }
+        // Note: Requires @discordjs/voice package for full implementation
+        this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
+        throw new Error('Voice join not implemented - requires @discordjs/voice package');
+        // Basic implementation would be:
+        // const { joinVoiceChannel } = require('@discordjs/voice');
+        // const connection = joinVoiceChannel({ ... });
         break;
 
       case 'leave-voice':
-        try {
-          // Note: Requires @discordjs/voice package for full implementation
-          this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
-          // Basic implementation would be:
-          // connection.destroy();
-        } catch (error) {
-          this.log('error', `Failed to leave voice channel: ${error.message}`);
-        }
+        // Note: Requires @discordjs/voice package for full implementation
+        this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
+        throw new Error('Voice leave not implemented - requires @discordjs/voice package');
+        // Basic implementation would be:
+        // connection.destroy();
         break;
 
       default:
