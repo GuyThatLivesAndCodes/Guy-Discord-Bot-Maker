@@ -108,6 +108,32 @@ const DataNode = ({ id, data }) => {
               }}
             />
           )}
+
+          {data.nodeType === 'string-to-file' && (
+            <div>
+              <label style={{ color: '#b5bac1', fontSize: '11px', marginBottom: '4px', display: 'block' }}>
+                Filename
+              </label>
+              <input
+                type="text"
+                value={data.config.filename || 'file.txt'}
+                onChange={(e) => handleConfigChange('filename', e.target.value)}
+                placeholder="file.txt"
+                style={{
+                  width: '100%',
+                  padding: '6px',
+                  background: '#2b2d31',
+                  border: '1px solid #383a40',
+                  borderRadius: '4px',
+                  color: '#fff',
+                  fontSize: '12px'
+                }}
+              />
+              <small style={{ color: '#b5bac1', fontSize: '10px', marginTop: '4px', display: 'block' }}>
+                💡 Connect STRING inputs to set content and filename dynamically
+              </small>
+            </div>
+          )}
         </div>
       )}
 

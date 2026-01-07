@@ -628,6 +628,21 @@ class BotRunner {
           ephemeral: config.ephemeral || false
         };
 
+        // Check for connected file attachment
+        const connectedFile = this.getInputValue(flowData, node.id, 'file', dataContext);
+        if (connectedFile) {
+          // If it's a file object with path and name
+          if (connectedFile.path) {
+            const { AttachmentBuilder } = require('discord.js');
+            messageOptions.files = [new AttachmentBuilder(connectedFile.path, { name: connectedFile.name })];
+          }
+          // If it's a Discord attachment (from command input)
+          else if (connectedFile.url) {
+            const { AttachmentBuilder } = require('discord.js');
+            messageOptions.files = [connectedFile.url];
+          }
+        }
+
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply(messageOptions);
         } else {
@@ -1298,9 +1313,69 @@ class BotRunner {
       case 'read-file-from-server':
         const filename = getUserInput('filename');
         if (filename) {
-          output.content = await this.readFileFromServer(filename);
+          const filepath = path.join(this.filesPath, filename);
+          if (fs.existsSync(filepath)) {
+            output.file = {
+              path: filepath,
+              name: filename,
+              size: fs.statSync(filepath).size
+            };
+          } else {
+            output.file = null;
+          }
+        } else {
+          output.file = null;
+        }
+        break;
+
+      case 'file-to-string':
+        const fileToRead = getUserInput('file');
+        if (fileToRead) {
+          // If it's a local file with path
+          if (fileToRead.path && fs.existsSync(fileToRead.path)) {
+            try {
+              output.content = fs.readFileSync(fileToRead.path, 'utf8');
+            } catch (error) {
+              this.log('error', `Failed to read file: ${error.message}`);
+              output.content = '';
+            }
+          }
+          // If it's a Discord attachment with URL
+          else if (fileToRead.url) {
+            try {
+              output.content = await this.readFileFromURL(fileToRead.url);
+            } catch (error) {
+              this.log('error', `Failed to read file from URL: ${error.message}`);
+              output.content = '';
+            }
+          } else {
+            output.content = '';
+          }
         } else {
           output.content = '';
+        }
+        break;
+
+      case 'string-to-file':
+        const contentToFile = getUserInput('content');
+        const filenameForFile = getUserInput('filename') || node.data.config?.filename || 'file.txt';
+
+        if (contentToFile && filenameForFile) {
+          // Create a temporary file
+          const tempFilePath = path.join(this.filesPath, `temp_${Date.now()}_${filenameForFile}`);
+          try {
+            fs.writeFileSync(tempFilePath, contentToFile, 'utf8');
+            output.file = {
+              path: tempFilePath,
+              name: filenameForFile,
+              size: Buffer.byteLength(contentToFile, 'utf8')
+            };
+          } catch (error) {
+            this.log('error', `Failed to create file: ${error.message}`);
+            output.file = null;
+          }
+        } else {
+          output.file = null;
         }
         break;
 

@@ -447,8 +447,30 @@ const DATA_NODES = [
     icon: '💾',
     color: '#9b59b6',
     inputs: [{ id: 'filename', type: 'STRING' }],
-    outputs: [{ id: 'content', type: 'STRING' }],
+    outputs: [{ id: 'file', type: 'ATTACHMENT' }],
     tags: ['file', 'read', 'server', 'storage', 'load', 'disk'],
+  },
+  {
+    type: 'file-to-string',
+    label: 'File to String',
+    icon: '📄',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'content', type: 'STRING' }],
+    tags: ['file', 'convert', 'string', 'text', 'read', 'content'],
+  },
+  {
+    type: 'string-to-file',
+    label: 'String to File',
+    icon: '📝',
+    color: '#9b59b6',
+    inputs: [
+      { id: 'content', type: 'STRING' },
+      { id: 'filename', type: 'STRING' },
+    ],
+    outputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    config: { filename: 'file.txt' },
+    tags: ['file', 'convert', 'string', 'text', 'create', 'make'],
   },
   // Variable nodes - Get
   {
@@ -497,12 +519,13 @@ const ACTION_TYPES = [
     inputs: [
       { id: 'flow', type: 'FLOW' },
       { id: 'content', type: 'STRING', optional: true },
+      { id: 'file', type: 'ATTACHMENT', optional: true },
     ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
-    tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk'],
+    tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk', 'image', 'attachment'],
   },
   {
     type: 'embed',
