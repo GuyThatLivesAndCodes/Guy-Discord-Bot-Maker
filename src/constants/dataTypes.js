@@ -9,4 +9,6 @@ export const DATA_TYPES = {
   NUMBER: { color: '#00aff4', label: 'Number' },
   BOOLEAN: { color: '#ed4245', label: 'Boolean' },
   ATTACHMENT: { color: '#9b59b6', label: 'File' },
+  INTERACTION: { color: '#3498db', label: 'Interaction' },
+  MESSAGE: { color: '#e91e63', label: 'Message' },
 };

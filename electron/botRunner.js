@@ -545,6 +545,7 @@ class BotRunner {
 
       // Initialize data context with trigger data
       const dataContext = {
+        interaction: interaction,
         user: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
@@ -801,7 +802,6 @@ class BotRunner {
 
         const messageOptions = {
           content: messageContent,
-          ephemeral: interaction ? (config.ephemeral || false) : undefined
         };
 
         // Check for connected file attachment
@@ -819,22 +819,34 @@ class BotRunner {
           }
         }
 
-        // For commands: use interaction.reply
-        // For event triggers: use channel.send
-        if (interaction) {
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply(messageOptions);
+        // Check for connected INTERACTION input (for replying to specific interaction)
+        const connectedInteraction = this.getInputValue(flowData, node.id, 'interaction', dataContext);
+        const useInteraction = connectedInteraction || interaction;
+
+        // Add ephemeral flag if using interaction
+        if (useInteraction) {
+          messageOptions.ephemeral = config.ephemeral || false;
+        }
+
+        let sentMessage;
+        // If we have an interaction, use it to reply
+        if (useInteraction) {
+          if (!useInteraction.replied && !useInteraction.deferred) {
+            sentMessage = await useInteraction.reply({ ...messageOptions, fetchReply: true });
           } else {
-            await interaction.followUp(messageOptions);
+            sentMessage = await useInteraction.followUp({ ...messageOptions, fetchReply: true });
           }
         } else {
-          // Event trigger - send to channel from context
+          // No interaction - send to channel from context
           const channel = dataContext.channel;
           if (!channel) {
             throw new Error('No channel available for sending message');
           }
-          await channel.send(messageOptions);
+          sentMessage = await channel.send(messageOptions);
         }
+
+        // Store the sent message in dataContext for MESSAGE output
+        dataContext[`${node.id}_message`] = sentMessage;
         break;
 
       case 'embed':
@@ -876,14 +888,36 @@ class BotRunner {
 
         const embedOptions = {
           embeds: [embed],
-          ephemeral: config.ephemeral || false
         };
 
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply(embedOptions);
-        } else {
-          await interaction.followUp(embedOptions);
+        // Check for connected INTERACTION input (for replying to specific interaction)
+        const connectedEmbedInteraction = this.getInputValue(flowData, node.id, 'interaction', dataContext);
+        const useEmbedInteraction = connectedEmbedInteraction || interaction;
+
+        // Add ephemeral flag if using interaction
+        if (useEmbedInteraction) {
+          embedOptions.ephemeral = config.ephemeral || false;
         }
+
+        let sentEmbedMessage;
+        // If we have an interaction, use it to reply
+        if (useEmbedInteraction) {
+          if (!useEmbedInteraction.replied && !useEmbedInteraction.deferred) {
+            sentEmbedMessage = await useEmbedInteraction.reply({ ...embedOptions, fetchReply: true });
+          } else {
+            sentEmbedMessage = await useEmbedInteraction.followUp({ ...embedOptions, fetchReply: true });
+          }
+        } else {
+          // No interaction - send to channel from context
+          const embedChannel = dataContext.channel;
+          if (!embedChannel) {
+            throw new Error('No channel available for sending embed');
+          }
+          sentEmbedMessage = await embedChannel.send(embedOptions);
+        }
+
+        // Store the sent message in dataContext for MESSAGE output
+        dataContext[`${node.id}_message`] = sentEmbedMessage;
         break;
 
       case 'add-role':
@@ -930,6 +964,15 @@ class BotRunner {
       case 'branch':
         // Branch node handles conditional flow - handled in executeFlow
         // The branch logic is handled by checking outputs in executeFlow
+        break;
+
+      case 'wait':
+        // Wait/delay action
+        const delaySeconds = this.getInputValue(flowData, node.id, 'seconds', dataContext) || config.seconds || 1;
+        const delayMs = delaySeconds * 1000;
+        this.log('info', `Waiting for ${delaySeconds} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        this.log('success', `Wait completed`);
         break;
 
       case 'timeout-member':
@@ -1040,12 +1083,20 @@ class BotRunner {
         break;
 
       case 'delete-message':
-        if (!interaction.message) {
-          throw new Error('No message to delete');
-        }
+        // Check for connected MESSAGE input
+        const messageToDelete = this.getInputValue(flowData, node.id, 'message', dataContext);
 
-        await interaction.message.delete();
-        this.log('success', 'Deleted message');
+        if (messageToDelete) {
+          // Delete the connected message
+          await messageToDelete.delete();
+          this.log('success', 'Deleted message from MESSAGE input');
+        } else if (interaction && interaction.message) {
+          // Fallback: delete interaction message (for message component interactions)
+          await interaction.message.delete();
+          this.log('success', 'Deleted interaction message');
+        } else {
+          throw new Error('No message to delete - connect a MESSAGE input or use on a message component');
+        }
         break;
 
       case 'pin-message':

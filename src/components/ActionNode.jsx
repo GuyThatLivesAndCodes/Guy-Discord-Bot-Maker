@@ -489,6 +489,25 @@ const ActionNode = ({ id, data }) => {
             </div>
           )}
 
+          {data.actionType === 'wait' && (
+            <div className="config-field">
+              <label>Delay (seconds)</label>
+              <input
+                type="number"
+                value={data.config.seconds || 1}
+                onChange={(e) => handleConfigChange('seconds', parseFloat(e.target.value) || 1)}
+                placeholder="1"
+                min="0"
+                step="0.1"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                ⏱️ Wait this many seconds before continuing (can use decimals like 0.5)
+              </small>
+            </div>
+          )}
+
           {data.actionType === 'save-file-to-server' && (
             <>
               <div className="config-field">

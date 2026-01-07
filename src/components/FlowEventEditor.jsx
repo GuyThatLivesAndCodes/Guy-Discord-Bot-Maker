@@ -598,11 +598,13 @@ const ACTION_TYPES = [
     defaultData: { content: 'Hello, World!', ephemeral: false },
     inputs: [
       { id: 'flow', type: 'FLOW' },
+      { id: 'interaction', type: 'INTERACTION', optional: true },
       { id: 'content', type: 'STRING', optional: true },
       { id: 'file', type: 'ATTACHMENT', optional: true },
     ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'message', type: 'MESSAGE', label: 'Sent Message' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk', 'image', 'attachment'],
@@ -630,6 +632,7 @@ const ACTION_TYPES = [
     },
     inputs: [
       { id: 'flow', type: 'FLOW' },
+      { id: 'interaction', type: 'INTERACTION', optional: true },
       { id: 'title', type: 'STRING', optional: true },
       { id: 'description', type: 'STRING', optional: true },
       { id: 'author', type: 'STRING', optional: true },
@@ -638,6 +641,7 @@ const ACTION_TYPES = [
     ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'message', type: 'MESSAGE', label: 'Sent Message' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['embed', 'message', 'rich', 'fancy', 'formatted', 'card'],
@@ -883,7 +887,10 @@ const ACTION_TYPES = [
     icon: '🗑️',
     color: '#ed4245',
     defaultData: {},
-    inputs: [{ id: 'flow', type: 'FLOW' }],
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'message', type: 'MESSAGE', optional: true },
+    ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
@@ -934,6 +941,21 @@ const ACTION_TYPES = [
       { id: 'false', type: 'FLOW', label: 'False' },
     ],
     tags: ['branch', 'if', 'condition', 'check', 'conditional', 'split', 'decision'],
+  },
+  {
+    type: 'wait',
+    label: 'Wait / Delay',
+    icon: '⏱️',
+    color: '#9b59b6',
+    defaultData: { seconds: 1 },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'seconds', type: 'NUMBER', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'After Delay' },
+    ],
+    tags: ['wait', 'delay', 'sleep', 'pause', 'timeout', 'timer', 'time'],
   },
   // File operation actions
   {
@@ -1126,6 +1148,7 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         // Command triggers have base outputs + options
         const baseOutputs = [
           { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'interaction', type: 'INTERACTION', label: 'Interaction' },
           { id: 'user', type: 'USER', label: 'User' },
           { id: 'channel', type: 'CHANNEL', label: 'Channel' },
           { id: 'guild', type: 'GUILD', label: 'Guild' },
@@ -1195,6 +1218,7 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         triggerConfig = TRIGGER_TYPES.command;
         const baseOutputs = [
           { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'interaction', type: 'INTERACTION', label: 'Interaction' },
           { id: 'user', type: 'USER', label: 'User' },
           { id: 'channel', type: 'CHANNEL', label: 'Channel' },
           { id: 'guild', type: 'GUILD', label: 'Guild' },
