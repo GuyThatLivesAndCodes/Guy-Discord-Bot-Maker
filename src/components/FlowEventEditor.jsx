@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -1045,6 +1045,7 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [loopWarning, setLoopWarning] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const hasAttachedCallbacks = useRef(false);
 
   // Filter nodes based on search term
   const filterNodes = (nodes) => {
@@ -1113,6 +1114,32 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
       setNodes([triggerNode, ...nodes]);
     }
   }, []);
+
+  // Ensure all loaded nodes have the onUpdate callback attached (run once on mount)
+  useEffect(() => {
+    if (hasAttachedCallbacks.current) return;
+
+    const needsUpdate = nodes.some(node =>
+      (node.type === 'actionNode' || node.type === 'dataNode') &&
+      !node.data.onUpdate
+    );
+
+    if (needsUpdate) {
+      hasAttachedCallbacks.current = true;
+      setNodes(nodes.map(node => {
+        if ((node.type === 'actionNode' || node.type === 'dataNode') && !node.data.onUpdate) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              onUpdate: updateNodeData,
+            },
+          };
+        }
+        return node;
+      }));
+    }
+  }, [nodes, setNodes, updateNodeData]);
 
   // Update trigger node outputs when config changes
   useEffect(() => {
