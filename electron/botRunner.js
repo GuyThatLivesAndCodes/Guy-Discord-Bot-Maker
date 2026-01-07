@@ -20,6 +20,7 @@ class BotRunner {
     this.client = null;
     this.isRunning = false;
     this.voiceConnections = new Map(); // Store voice connections per guild
+    this.audioPlayers = new Map(); // Store audio players per guild
 
     // Initialize storage directories
     this.storagePath = path.join(process.cwd(), 'bot-storage', this.botId);
@@ -941,11 +942,109 @@ class BotRunner {
         }
 
         try {
+          // Stop any playing audio first
+          const player = this.audioPlayers.get(interaction.guild.id);
+          if (player) {
+            player.stop();
+            this.audioPlayers.delete(interaction.guild.id);
+          }
+
           connection.destroy();
           this.voiceConnections.delete(interaction.guild.id);
           this.log('success', 'Left voice channel');
         } catch (error) {
           throw new Error(`Failed to leave voice channel: ${error.message}`);
+        }
+        break;
+
+      case 'stream-file-voice':
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot stream audio outside of a guild');
+        }
+
+        const voiceConnection = this.voiceConnections.get(interaction.guild.id);
+        if (!voiceConnection) {
+          throw new Error('Not connected to any voice channel. Use "Join Voice Channel" first.');
+        }
+
+        try {
+          const { createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus } = voiceModule;
+
+          // Get file input - either from ATTACHMENT or filename STRING
+          let fileToStream = this.getInputValue(flowData, node.id, 'file', dataContext);
+          const filenameInput = this.getInputValue(flowData, node.id, 'filename', dataContext);
+
+          let filePath;
+          if (fileToStream && fileToStream.path) {
+            // File object from Read File from Server or String to File
+            filePath = fileToStream.path;
+          } else if (filenameInput) {
+            // Filename string - look in server storage
+            filePath = path.join(this.filesPath, filenameInput);
+            if (!fs.existsSync(filePath)) {
+              throw new Error(`File not found: ${filenameInput}`);
+            }
+          } else {
+            throw new Error('No file specified. Connect a file or filename.');
+          }
+
+          // Stop any currently playing audio
+          let player = this.audioPlayers.get(interaction.guild.id);
+          if (player) {
+            player.stop();
+          } else {
+            player = createAudioPlayer();
+            this.audioPlayers.set(interaction.guild.id, player);
+          }
+
+          // Create audio resource from file
+          const resource = createAudioResource(filePath);
+
+          // Subscribe connection to player
+          voiceConnection.subscribe(player);
+
+          // Play the audio
+          player.play(resource);
+
+          // Log when finished playing
+          player.on(AudioPlayerStatus.Idle, () => {
+            this.log('info', 'Finished playing audio');
+          });
+
+          player.on('error', (error) => {
+            this.log('error', `Audio player error: ${error.message}`);
+          });
+
+          const filename = path.basename(filePath);
+          this.log('success', `Started streaming: ${filename}`);
+        } catch (error) {
+          throw new Error(`Failed to stream file: ${error.message}`);
+        }
+        break;
+
+      case 'stop-voice-stream':
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot stop stream outside of a guild');
+        }
+
+        const audioPlayer = this.audioPlayers.get(interaction.guild.id);
+        if (!audioPlayer) {
+          throw new Error('No audio is currently playing');
+        }
+
+        try {
+          audioPlayer.stop();
+          this.log('success', 'Stopped audio stream');
+        } catch (error) {
+          throw new Error(`Failed to stop stream: ${error.message}`);
         }
         break;
 
@@ -1379,6 +1478,16 @@ class BotRunner {
         }
         break;
 
+      case 'check-file-exists':
+        const fileToCheck = getUserInput('filename');
+        if (fileToCheck) {
+          const checkFilePath = path.join(this.filesPath, fileToCheck);
+          output.exists = fs.existsSync(checkFilePath);
+        } else {
+          output.exists = false;
+        }
+        break;
+
       // Variable data nodes
       case 'get-variable-global':
         const globalVarKey = getUserInput('key');
@@ -1425,6 +1534,19 @@ class BotRunner {
   stop() {
     if (this.client) {
       this.log('info', 'Stopping bot...');
+
+      // Stop all audio players
+      if (this.audioPlayers.size > 0) {
+        this.log('info', `Stopping ${this.audioPlayers.size} audio players...`);
+        for (const [guildId, player] of this.audioPlayers) {
+          try {
+            player.stop();
+          } catch (error) {
+            this.log('error', `Failed to stop audio player in guild ${guildId}: ${error.message}`);
+          }
+        }
+        this.audioPlayers.clear();
+      }
 
       // Disconnect from all voice channels
       if (this.voiceConnections.size > 0) {

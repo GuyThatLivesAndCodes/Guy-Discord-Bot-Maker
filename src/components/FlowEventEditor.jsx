@@ -472,6 +472,15 @@ const DATA_NODES = [
     config: { filename: 'file.txt' },
     tags: ['file', 'convert', 'string', 'text', 'create', 'make'],
   },
+  {
+    type: 'check-file-exists',
+    label: 'Check File Exists',
+    icon: '🔍',
+    color: '#9b59b6',
+    inputs: [{ id: 'filename', type: 'STRING' }],
+    outputs: [{ id: 'exists', type: 'BOOLEAN' }],
+    tags: ['file', 'check', 'exists', 'find', 'search', 'server', 'storage'],
+  },
   // Variable nodes - Get
   {
     type: 'get-variable-global',
@@ -765,6 +774,36 @@ const ACTION_TYPES = [
       { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['voice', 'vc', 'deafen', 'deaf', 'audio', 'moderate'],
+  },
+  {
+    type: 'stream-file-voice',
+    label: 'Stream File in Voice',
+    icon: '🎵',
+    color: '#9b59b6',
+    defaultData: {},
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'file', type: 'ATTACHMENT', optional: true },
+      { id: 'filename', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['voice', 'vc', 'stream', 'play', 'audio', 'video', 'music', 'sound', 'mp3', 'mp4'],
+  },
+  {
+    type: 'stop-voice-stream',
+    label: 'Stop Voice Stream',
+    icon: '⏹️',
+    color: '#ed4245',
+    defaultData: {},
+    inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['voice', 'vc', 'stop', 'pause', 'audio', 'music'],
   },
   // Message/Channel Actions
   {
