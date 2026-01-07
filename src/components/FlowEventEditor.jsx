@@ -22,12 +22,83 @@ const nodeTypes = {
   dataNode: DataNodeComponent,
 };
 
-// Trigger node (auto-added for commands)
-const TRIGGER_NODE = {
-  type: 'on-command-ran',
-  label: 'On Command Ran',
-  icon: '⚡',
-  color: '#5865f2',
+// Trigger configurations
+const TRIGGER_TYPES = {
+  command: {
+    type: 'on-command-ran',
+    label: 'On Command Ran',
+    icon: '⚡',
+    color: '#5865f2',
+  },
+  messageCreate: {
+    type: 'on-message-create',
+    label: 'On Message Sent',
+    icon: '💬',
+    color: '#5865f2',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'message', type: 'STRING', label: 'Message Content' },
+      { id: 'user', type: 'USER', label: 'Author' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
+  guildMemberAdd: {
+    type: 'on-member-join',
+    label: 'On Member Join',
+    icon: '👋',
+    color: '#57f287',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'New Member' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
+  guildMemberRemove: {
+    type: 'on-member-leave',
+    label: 'On Member Leave',
+    icon: '👋',
+    color: '#ed4245',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'Member' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
+  messageReactionAdd: {
+    type: 'on-reaction-add',
+    label: 'On Reaction Added',
+    icon: '👍',
+    color: '#faa61a',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'emoji', type: 'STRING', label: 'Emoji' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+    ],
+  },
+  messageDelete: {
+    type: 'on-message-delete',
+    label: 'On Message Deleted',
+    icon: '🗑️',
+    color: '#ed4245',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'content', type: 'STRING', label: 'Message Content' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+    ],
+  },
+  voiceStateUpdate: {
+    type: 'on-voice-state-update',
+    label: 'On Voice State Change',
+    icon: '🔊',
+    color: '#9b59b6',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
 };
 
 // Data converter nodes
@@ -993,29 +1064,45 @@ function FlowEventEditor({ event, onSave, onClose }) {
   // Auto-add trigger node if it doesn't exist
   useEffect(() => {
     if (nodes.length === 0 || !nodes.find(n => n.type === 'triggerNode')) {
-      const baseOutputs = [
-        { id: 'flow', type: 'FLOW', label: 'Flow' },
-        { id: 'user', type: 'USER', label: 'User' },
-        { id: 'channel', type: 'CHANNEL', label: 'Channel' },
-        { id: 'guild', type: 'GUILD', label: 'Guild' },
-      ];
+      // Get trigger config based on event type
+      let triggerConfig;
+      if (eventConfig.type === 'command') {
+        triggerConfig = TRIGGER_TYPES.command;
+      } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+      } else {
+        triggerConfig = TRIGGER_TYPES.command;
+      }
 
-      // Add command options as outputs
-      const optionOutputs = (eventConfig.options || []).map(option => ({
-        id: `option-${option.name}`,
-        type: option.type,
-        label: option.name,
-      }));
+      let outputs;
+      if (eventConfig.type === 'command') {
+        // Command triggers have base outputs + options
+        const baseOutputs = [
+          { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'user', type: 'USER', label: 'User' },
+          { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+          { id: 'guild', type: 'GUILD', label: 'Guild' },
+        ];
+        const optionOutputs = (eventConfig.options || []).map(option => ({
+          id: `option-${option.name}`,
+          type: option.type,
+          label: option.name,
+        }));
+        outputs = [...baseOutputs, ...optionOutputs];
+      } else {
+        // Event triggers have predefined outputs
+        outputs = triggerConfig.outputs || [];
+      }
 
       const triggerNode = {
         id: 'trigger-node',
         type: 'triggerNode',
         position: { x: 250, y: 50 },
         data: {
-          label: TRIGGER_NODE.label,
-          icon: TRIGGER_NODE.icon,
-          color: TRIGGER_NODE.color,
-          outputs: [...baseOutputs, ...optionOutputs],
+          label: triggerConfig.label,
+          icon: triggerConfig.icon,
+          color: triggerConfig.color,
+          outputs: outputs,
         },
         draggable: false,
       };
@@ -1023,37 +1110,50 @@ function FlowEventEditor({ event, onSave, onClose }) {
     }
   }, []);
 
-  // Update trigger node outputs when command options change
+  // Update trigger node outputs when config changes
   useEffect(() => {
     const triggerNode = nodes.find(n => n.type === 'triggerNode');
     if (triggerNode) {
-      const baseOutputs = [
-        { id: 'flow', type: 'FLOW', label: 'Flow' },
-        { id: 'user', type: 'USER', label: 'User' },
-        { id: 'channel', type: 'CHANNEL', label: 'Channel' },
-        { id: 'guild', type: 'GUILD', label: 'Guild' },
-      ];
+      // Get trigger config based on event type
+      let triggerConfig;
+      let newOutputs;
 
-      // Add command options as outputs
-      const optionOutputs = (eventConfig.options || []).map(option => ({
-        id: `option-${option.name}`,
-        type: option.type,
-        label: option.name,
-      }));
+      if (eventConfig.type === 'command') {
+        triggerConfig = TRIGGER_TYPES.command;
+        const baseOutputs = [
+          { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'user', type: 'USER', label: 'User' },
+          { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+          { id: 'guild', type: 'GUILD', label: 'Guild' },
+        ];
+        const optionOutputs = (eventConfig.options || []).map(option => ({
+          id: `option-${option.name}`,
+          type: option.type,
+          label: option.name,
+        }));
+        newOutputs = [...baseOutputs, ...optionOutputs];
+      } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+        newOutputs = triggerConfig.outputs || [];
+      } else {
+        return; // No valid config
+      }
 
-      const newOutputs = [...baseOutputs, ...optionOutputs];
-
-      // Only update if outputs actually changed
+      // Only update if outputs or label actually changed
       const currentOutputs = triggerNode.data.outputs || [];
       const outputsChanged = JSON.stringify(currentOutputs) !== JSON.stringify(newOutputs);
+      const labelChanged = triggerNode.data.label !== triggerConfig.label;
 
-      if (outputsChanged) {
+      if (outputsChanged || labelChanged) {
         setNodes(nodes.map(node =>
           node.id === 'trigger-node'
             ? {
                 ...node,
                 data: {
                   ...node.data,
+                  label: triggerConfig.label,
+                  icon: triggerConfig.icon,
+                  color: triggerConfig.color,
                   outputs: newOutputs,
                 },
               }
@@ -1061,7 +1161,7 @@ function FlowEventEditor({ event, onSave, onClose }) {
         ));
       }
     }
-  }, [eventConfig.options, nodes, setNodes]);
+  }, [eventConfig.type, eventConfig.triggerType, eventConfig.options, nodes, setNodes]);
 
   const detectLoops = useCallback((currentEdges) => {
     const adjacency = {};
@@ -1289,6 +1389,11 @@ function FlowEventEditor({ event, onSave, onClose }) {
       return;
     }
 
+    if (eventConfig.type === 'event' && !eventConfig.triggerType) {
+      alert('Please select a trigger type');
+      return;
+    }
+
     const updatedEvent = {
       ...eventConfig,
       flowData: { nodes, edges },
@@ -1307,10 +1412,48 @@ function FlowEventEditor({ event, onSave, onClose }) {
             <div className="form-group">
               <label>Event Type</label>
               <div className="event-type-badge">
-                <span className="event-icon">⚡</span>
-                <span>Command</span>
+                <span className="event-icon">{eventConfig.type === 'command' ? '⚡' : '🎯'}</span>
+                <span>{eventConfig.type === 'command' ? 'Command' : 'Event Trigger'}</span>
               </div>
             </div>
+
+            {eventConfig.type === 'event' && (
+              <>
+                <div className="form-group">
+                  <label>Trigger Type *</label>
+                  <select
+                    value={eventConfig.triggerType || 'messageCreate'}
+                    onChange={(e) => setEventConfig({ ...eventConfig, triggerType: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      background: '#2b2d31',
+                      border: '1px solid #383a40',
+                      borderRadius: '4px',
+                      color: '#fff',
+                      fontSize: '13px',
+                    }}
+                  >
+                    <option value="messageCreate">💬 On Message Sent</option>
+                    <option value="guildMemberAdd">👋 On Member Join</option>
+                    <option value="guildMemberRemove">👋 On Member Leave</option>
+                    <option value="messageReactionAdd">👍 On Reaction Added</option>
+                    <option value="messageDelete">🗑️ On Message Deleted</option>
+                    <option value="voiceStateUpdate">🔊 On Voice State Change</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Description</label>
+                  <input
+                    type="text"
+                    value={eventConfig.description || ''}
+                    onChange={(e) => setEventConfig({ ...eventConfig, description: e.target.value })}
+                    placeholder="Event description"
+                  />
+                </div>
+              </>
+            )}
 
             {eventConfig.type === 'command' && (
               <>

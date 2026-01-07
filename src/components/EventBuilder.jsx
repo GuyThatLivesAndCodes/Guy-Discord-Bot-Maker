@@ -12,11 +12,11 @@ const EVENT_TYPES = [
     available: true,
   },
   {
-    type: 'responsive-trigger',
+    type: 'event',
     label: 'Event Trigger',
     icon: '🎯',
-    description: 'Discord event triggers (user join/leave, message delete, etc.) - Coming Soon',
-    available: false,
+    description: 'Triggered by Discord events (message, member join, reactions, etc.)',
+    available: true,
   },
 ];
 
@@ -135,6 +135,7 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
                 </div>
                 <div className="event-card-body">
                   {event.type === 'command' && <div className="event-name">/{event.name}</div>}
+                  {event.type === 'event' && <div className="event-name">{event.triggerType || 'Event'}</div>}
                   <p className="event-description">{event.description || 'No description'}</p>
                   <div className="event-stats">
                     <span className="stat">

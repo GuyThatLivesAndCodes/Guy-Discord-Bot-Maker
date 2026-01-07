@@ -177,9 +177,16 @@ class BotRunner {
     // Analyze all events to determine which intents are needed
     const events = this.config.events || [];
     const usedNodeTypes = new Set();
+    const usedTriggerTypes = new Set();
 
-    // Collect all node types used across all events
+    // Collect all node types and trigger types used across all events
     events.forEach(event => {
+      // Track event trigger types
+      if (event.type === 'event' && event.triggerType) {
+        usedTriggerTypes.add(event.triggerType);
+      }
+
+      // Track node types
       if (event.flowData && event.flowData.nodes) {
         event.flowData.nodes.forEach(node => {
           if (node.type === 'dataNode' && node.data?.nodeType) {
@@ -191,8 +198,30 @@ class BotRunner {
       }
     });
 
+    // Event triggers that need specific intents
+    if (usedTriggerTypes.has('messageCreate') || usedTriggerTypes.has('messageDelete')) {
+      intents.push(GatewayIntentBits.GuildMessages);
+      intents.push(GatewayIntentBits.MessageContent);
+      this.log('info', 'Message event triggers detected - loading GuildMessages and MessageContent intents');
+    }
+
+    if (usedTriggerTypes.has('guildMemberAdd') || usedTriggerTypes.has('guildMemberRemove')) {
+      intents.push(GatewayIntentBits.GuildMembers);
+      this.log('info', 'Member event triggers detected - loading GuildMembers intent');
+    }
+
+    if (usedTriggerTypes.has('messageReactionAdd')) {
+      intents.push(GatewayIntentBits.GuildMessageReactions);
+      this.log('info', 'Reaction event triggers detected - loading GuildMessageReactions intent');
+    }
+
+    if (usedTriggerTypes.has('voiceStateUpdate')) {
+      intents.push(GatewayIntentBits.GuildVoiceStates);
+      this.log('info', 'Voice event triggers detected - loading GuildVoiceStates intent');
+    }
+
     // Voice-related nodes need GuildVoiceStates
-    const voiceNodes = ['join-voice', 'leave-voice', 'move-member-voice', 'mute-member-voice', 'deafen-member-voice'];
+    const voiceNodes = ['join-voice', 'leave-voice', 'move-member-voice', 'mute-member-voice', 'deafen-member-voice', 'stream-file-voice'];
     if (voiceNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
       intents.push(GatewayIntentBits.GuildVoiceStates);
       this.log('info', 'Voice nodes detected - loading GuildVoiceStates intent');
@@ -334,6 +363,7 @@ class BotRunner {
       this.log('info', `Serving ${this.client.guilds.cache.size} servers`);
     });
 
+    // Command interaction handler
     this.client.on('interactionCreate', async (interaction) => {
       if (!interaction.isChatInputCommand()) return;
 
@@ -356,6 +386,12 @@ class BotRunner {
       }
     });
 
+    // Register Discord event triggers
+    const eventTriggers = (this.config.events || []).filter(event => event.type === 'event');
+    eventTriggers.forEach(eventTrigger => {
+      this.registerEventTrigger(eventTrigger);
+    });
+
     this.client.on('error', (error) => {
       this.log('error', `Client error: ${error.message}`);
     });
@@ -363,6 +399,136 @@ class BotRunner {
     this.client.on('disconnect', () => {
       this.log('info', 'Bot disconnected');
     });
+  }
+
+  registerEventTrigger(eventTrigger) {
+    const triggerType = eventTrigger.triggerType;
+
+    switch (triggerType) {
+      case 'messageCreate':
+        this.client.on('messageCreate', async (message) => {
+          if (message.author.bot) return; // Ignore bot messages
+          try {
+            await this.executeEventFlow(eventTrigger, { message });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Message Sent');
+        break;
+
+      case 'guildMemberAdd':
+        this.client.on('guildMemberAdd', async (member) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { member });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Member Join');
+        break;
+
+      case 'guildMemberRemove':
+        this.client.on('guildMemberRemove', async (member) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { member });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Member Leave');
+        break;
+
+      case 'messageReactionAdd':
+        this.client.on('messageReactionAdd', async (reaction, user) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { reaction, user });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Reaction Added');
+        break;
+
+      case 'messageDelete':
+        this.client.on('messageDelete', async (message) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { message });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Message Deleted');
+        break;
+
+      case 'voiceStateUpdate':
+        this.client.on('voiceStateUpdate', async (oldState, newState) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { oldState, newState });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Voice State Change');
+        break;
+
+      default:
+        this.log('warning', `Unknown event trigger type: ${triggerType}`);
+    }
+  }
+
+  async executeEventFlow(eventTrigger, eventData) {
+    const flowData = eventTrigger.flowData;
+
+    if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
+      return;
+    }
+
+    this.log('info', `Executing event flow: ${eventTrigger.triggerType}`);
+
+    // Initialize data context based on event type
+    const dataContext = {};
+
+    switch (eventTrigger.triggerType) {
+      case 'messageCreate':
+        dataContext.message = eventData.message.content;
+        dataContext.user = eventData.message.author;
+        dataContext.channel = eventData.message.channel;
+        dataContext.guild = eventData.message.guild;
+        break;
+
+      case 'guildMemberAdd':
+      case 'guildMemberRemove':
+        dataContext.user = eventData.member.user;
+        dataContext.guild = eventData.member.guild;
+        break;
+
+      case 'messageReactionAdd':
+        dataContext.emoji = eventData.reaction.emoji.name;
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.reaction.message.channel;
+        break;
+
+      case 'messageDelete':
+        dataContext.content = eventData.message.content || '';
+        dataContext.channel = eventData.message.channel;
+        break;
+
+      case 'voiceStateUpdate':
+        dataContext.user = eventData.newState.member?.user;
+        dataContext.guild = eventData.newState.guild;
+        break;
+    }
+
+    // Find trigger node
+    const triggerNode = flowData.nodes.find(n => n.type === 'triggerNode');
+    if (!triggerNode) {
+      this.log('error', 'No trigger node found in event flow');
+      return;
+    }
+
+    // Execute flow starting from trigger node
+    await this.executeNode(flowData, triggerNode, dataContext, null);
   }
 
   async executeCommand(interaction, command) {
