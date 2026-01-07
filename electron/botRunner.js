@@ -8,6 +8,15 @@ const http = require('http');
 let voiceModule = null;
 try {
   voiceModule = require('@discordjs/voice');
+
+  // Configure FFmpeg path for voice streaming
+  try {
+    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+    process.env.FFMPEG_PATH = ffmpegPath;
+    console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
+  } catch (ffmpegError) {
+    console.warn('[Voice] @ffmpeg-installer/ffmpeg not installed. Voice streaming may not work. Run: npm install @ffmpeg-installer/ffmpeg');
+  }
 } catch (error) {
   console.warn('[@discordjs/voice] not installed. Voice features will be disabled. Run: npm install @discordjs/voice');
 }
