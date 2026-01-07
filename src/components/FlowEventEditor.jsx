@@ -1046,12 +1046,20 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const [loopWarning, setLoopWarning] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const hasAttachedCallbacks = useRef(false);
-  const hasSyncedEvent = useRef(false);
+  const lastEventId = useRef(null);
 
-  // Sync eventConfig when the event prop changes (when reopening saved events)
+  // Sync eventConfig when opening a different event
   useEffect(() => {
-    if (event && !hasSyncedEvent.current) {
-      hasSyncedEvent.current = true;
+    // Create a stable ID for the event (could be undefined for new events)
+    const currentEventId = event ? JSON.stringify({
+      name: event.name,
+      type: event.type,
+      triggerType: event.triggerType
+    }) : null;
+
+    // Only sync if this is a different event than before
+    if (event && currentEventId !== lastEventId.current) {
+      lastEventId.current = currentEventId;
       setEventConfig(event);
       if (event.flowData) {
         setNodes(event.flowData.nodes || []);
