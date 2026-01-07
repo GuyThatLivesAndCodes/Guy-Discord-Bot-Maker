@@ -1,4 +1,25 @@
 const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const http = require('http');
+
+// Try to load @discordjs/voice, handle if not installed
+let voiceModule = null;
+try {
+  voiceModule = require('@discordjs/voice');
+
+  // Configure FFmpeg path for voice streaming
+  try {
+    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+    process.env.FFMPEG_PATH = ffmpegPath;
+    console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
+  } catch (ffmpegError) {
+    console.warn('[Voice] @ffmpeg-installer/ffmpeg not installed. Voice streaming may not work. Run: npm install @ffmpeg-installer/ffmpeg');
+  }
+} catch (error) {
+  console.warn('[@discordjs/voice] not installed. Voice features will be disabled. Run: npm install @discordjs/voice');
+}
 
 class BotRunner {
   constructor(botId, config, logCallback) {
@@ -7,6 +28,133 @@ class BotRunner {
     this.logCallback = logCallback;
     this.client = null;
     this.isRunning = false;
+    this.voiceConnections = new Map(); // Store voice connections per guild
+    this.audioPlayers = new Map(); // Store audio players per guild
+
+    // Initialize storage directories
+    this.storagePath = path.join(process.cwd(), 'bot-storage', this.botId);
+    this.filesPath = path.join(this.storagePath, 'files');
+    this.variablesPath = path.join(this.storagePath, 'variables');
+    this.ensureStorageDirectories();
+  }
+
+  ensureStorageDirectories() {
+    try {
+      if (!fs.existsSync(this.storagePath)) {
+        fs.mkdirSync(this.storagePath, { recursive: true });
+      }
+      if (!fs.existsSync(this.filesPath)) {
+        fs.mkdirSync(this.filesPath, { recursive: true });
+      }
+      if (!fs.existsSync(this.variablesPath)) {
+        fs.mkdirSync(this.variablesPath, { recursive: true });
+      }
+    } catch (error) {
+      this.log('error', `Failed to create storage directories: ${error.message}`);
+    }
+  }
+
+  // Variable storage methods
+  async setVariable(scope, scopeId, key, value) {
+    try {
+      const filename = scope === 'global'
+        ? path.join(this.variablesPath, 'global.json')
+        : path.join(this.variablesPath, `${scope}-${scopeId}.json`);
+
+      let data = {};
+      if (fs.existsSync(filename)) {
+        const fileContent = fs.readFileSync(filename, 'utf8');
+        data = JSON.parse(fileContent);
+      }
+
+      data[key] = value;
+      fs.writeFileSync(filename, JSON.stringify(data, null, 2));
+      return true;
+    } catch (error) {
+      this.log('error', `Failed to set variable: ${error.message}`);
+      return false;
+    }
+  }
+
+  async getVariable(scope, scopeId, key) {
+    try {
+      const filename = scope === 'global'
+        ? path.join(this.variablesPath, 'global.json')
+        : path.join(this.variablesPath, `${scope}-${scopeId}.json`);
+
+      if (!fs.existsSync(filename)) {
+        return '';
+      }
+
+      const fileContent = fs.readFileSync(filename, 'utf8');
+      const data = JSON.parse(fileContent);
+      return data[key] || '';
+    } catch (error) {
+      this.log('error', `Failed to get variable: ${error.message}`);
+      return '';
+    }
+  }
+
+  // File operations
+  async saveFileToServer(filename, content) {
+    try {
+      const filepath = path.join(this.filesPath, filename);
+      fs.writeFileSync(filepath, content);
+      return true;
+    } catch (error) {
+      this.log('error', `Failed to save file: ${error.message}`);
+      return false;
+    }
+  }
+
+  async readFileFromServer(filename) {
+    try {
+      const filepath = path.join(this.filesPath, filename);
+      if (!fs.existsSync(filepath)) {
+        return '';
+      }
+      return fs.readFileSync(filepath, 'utf8');
+    } catch (error) {
+      this.log('error', `Failed to read file: ${error.message}`);
+      return '';
+    }
+  }
+
+  async downloadFile(url, filename) {
+    return new Promise((resolve, reject) => {
+      const filepath = path.join(this.filesPath, filename);
+      const file = fs.createWriteStream(filepath);
+      const protocol = url.startsWith('https') ? https : http;
+
+      protocol.get(url, (response) => {
+        response.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          resolve(true);
+        });
+      }).on('error', (err) => {
+        fs.unlink(filepath, () => {});
+        reject(err);
+      });
+    });
+  }
+
+  async readFileFromURL(url) {
+    return new Promise((resolve, reject) => {
+      const protocol = url.startsWith('https') ? https : http;
+
+      protocol.get(url, (response) => {
+        let data = '';
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        response.on('end', () => {
+          resolve(data);
+        });
+      }).on('error', (err) => {
+        reject(err);
+      });
+    });
   }
 
   log(type, message) {
@@ -29,9 +177,16 @@ class BotRunner {
     // Analyze all events to determine which intents are needed
     const events = this.config.events || [];
     const usedNodeTypes = new Set();
+    const usedTriggerTypes = new Set();
 
-    // Collect all node types used across all events
+    // Collect all node types and trigger types used across all events
     events.forEach(event => {
+      // Track event trigger types
+      if (event.type === 'event' && event.triggerType) {
+        usedTriggerTypes.add(event.triggerType);
+      }
+
+      // Track node types
       if (event.flowData && event.flowData.nodes) {
         event.flowData.nodes.forEach(node => {
           if (node.type === 'dataNode' && node.data?.nodeType) {
@@ -43,8 +198,30 @@ class BotRunner {
       }
     });
 
+    // Event triggers that need specific intents
+    if (usedTriggerTypes.has('messageCreate') || usedTriggerTypes.has('messageDelete')) {
+      intents.push(GatewayIntentBits.GuildMessages);
+      intents.push(GatewayIntentBits.MessageContent);
+      this.log('info', 'Message event triggers detected - loading GuildMessages and MessageContent intents');
+    }
+
+    if (usedTriggerTypes.has('guildMemberAdd') || usedTriggerTypes.has('guildMemberRemove')) {
+      intents.push(GatewayIntentBits.GuildMembers);
+      this.log('info', 'Member event triggers detected - loading GuildMembers intent');
+    }
+
+    if (usedTriggerTypes.has('messageReactionAdd')) {
+      intents.push(GatewayIntentBits.GuildMessageReactions);
+      this.log('info', 'Reaction event triggers detected - loading GuildMessageReactions intent');
+    }
+
+    if (usedTriggerTypes.has('voiceStateUpdate')) {
+      intents.push(GatewayIntentBits.GuildVoiceStates);
+      this.log('info', 'Voice event triggers detected - loading GuildVoiceStates intent');
+    }
+
     // Voice-related nodes need GuildVoiceStates
-    const voiceNodes = ['join-voice', 'leave-voice', 'move-member-voice', 'mute-member-voice', 'deafen-member-voice'];
+    const voiceNodes = ['join-voice', 'leave-voice', 'move-member-voice', 'mute-member-voice', 'deafen-member-voice', 'stream-file-voice'];
     if (voiceNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
       intents.push(GatewayIntentBits.GuildVoiceStates);
       this.log('info', 'Voice nodes detected - loading GuildVoiceStates intent');
@@ -138,6 +315,7 @@ class BotRunner {
             'USER': 6,
             'CHANNEL': 7,
             'ROLE': 8,
+            'ATTACHMENT': 11,
           };
 
           option.type = typeMap[opt.type] || 3; // Default to STRING
@@ -185,6 +363,7 @@ class BotRunner {
       this.log('info', `Serving ${this.client.guilds.cache.size} servers`);
     });
 
+    // Command interaction handler
     this.client.on('interactionCreate', async (interaction) => {
       if (!interaction.isChatInputCommand()) return;
 
@@ -207,6 +386,12 @@ class BotRunner {
       }
     });
 
+    // Register Discord event triggers
+    const eventTriggers = (this.config.events || []).filter(event => event.type === 'event');
+    eventTriggers.forEach(eventTrigger => {
+      this.registerEventTrigger(eventTrigger);
+    });
+
     this.client.on('error', (error) => {
       this.log('error', `Client error: ${error.message}`);
     });
@@ -214,6 +399,136 @@ class BotRunner {
     this.client.on('disconnect', () => {
       this.log('info', 'Bot disconnected');
     });
+  }
+
+  registerEventTrigger(eventTrigger) {
+    const triggerType = eventTrigger.triggerType;
+
+    switch (triggerType) {
+      case 'messageCreate':
+        this.client.on('messageCreate', async (message) => {
+          if (message.author.bot) return; // Ignore bot messages
+          try {
+            await this.executeEventFlow(eventTrigger, { message });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Message Sent');
+        break;
+
+      case 'guildMemberAdd':
+        this.client.on('guildMemberAdd', async (member) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { member });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Member Join');
+        break;
+
+      case 'guildMemberRemove':
+        this.client.on('guildMemberRemove', async (member) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { member });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Member Leave');
+        break;
+
+      case 'messageReactionAdd':
+        this.client.on('messageReactionAdd', async (reaction, user) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { reaction, user });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Reaction Added');
+        break;
+
+      case 'messageDelete':
+        this.client.on('messageDelete', async (message) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { message });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Message Deleted');
+        break;
+
+      case 'voiceStateUpdate':
+        this.client.on('voiceStateUpdate', async (oldState, newState) => {
+          try {
+            await this.executeEventFlow(eventTrigger, { oldState, newState });
+          } catch (error) {
+            this.log('error', `Event trigger error: ${error.message}`);
+          }
+        });
+        this.log('info', 'Registered event trigger: On Voice State Change');
+        break;
+
+      default:
+        this.log('warning', `Unknown event trigger type: ${triggerType}`);
+    }
+  }
+
+  async executeEventFlow(eventTrigger, eventData) {
+    const flowData = eventTrigger.flowData;
+
+    if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
+      return;
+    }
+
+    this.log('info', `Executing event flow: ${eventTrigger.triggerType}`);
+
+    // Initialize data context based on event type
+    const dataContext = {};
+
+    switch (eventTrigger.triggerType) {
+      case 'messageCreate':
+        dataContext.message = eventData.message.content;
+        dataContext.user = eventData.message.author;
+        dataContext.channel = eventData.message.channel;
+        dataContext.guild = eventData.message.guild;
+        break;
+
+      case 'guildMemberAdd':
+      case 'guildMemberRemove':
+        dataContext.user = eventData.member.user;
+        dataContext.guild = eventData.member.guild;
+        break;
+
+      case 'messageReactionAdd':
+        dataContext.emoji = eventData.reaction.emoji.name;
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.reaction.message.channel;
+        break;
+
+      case 'messageDelete':
+        dataContext.content = eventData.message.content || '';
+        dataContext.channel = eventData.message.channel;
+        break;
+
+      case 'voiceStateUpdate':
+        dataContext.user = eventData.newState.member?.user;
+        dataContext.guild = eventData.newState.guild;
+        break;
+    }
+
+    // Find trigger node
+    const triggerNode = flowData.nodes.find(n => n.type === 'triggerNode');
+    if (!triggerNode) {
+      this.log('error', 'No trigger node found in event flow');
+      return;
+    }
+
+    // Execute flow starting from trigger node (no interaction for event triggers)
+    await this.executeNode(null, flowData, triggerNode, dataContext);
   }
 
   async executeCommand(interaction, command) {
@@ -250,6 +565,8 @@ class BotRunner {
               dataContext[`option-${opt.name}`] = value.channel;
             } else if (opt.type === 'ROLE') {
               dataContext[`option-${opt.name}`] = value.role;
+            } else if (opt.type === 'ATTACHMENT') {
+              dataContext[`option-${opt.name}`] = value.attachment;
             } else {
               dataContext[`option-${opt.name}`] = value.value;
             }
@@ -484,13 +801,39 @@ class BotRunner {
 
         const messageOptions = {
           content: messageContent,
-          ephemeral: config.ephemeral || false
+          ephemeral: interaction ? (config.ephemeral || false) : undefined
         };
 
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply(messageOptions);
+        // Check for connected file attachment
+        const connectedFile = this.getInputValue(flowData, node.id, 'file', dataContext);
+        if (connectedFile) {
+          // If it's a file object with path and name
+          if (connectedFile.path) {
+            const { AttachmentBuilder } = require('discord.js');
+            messageOptions.files = [new AttachmentBuilder(connectedFile.path, { name: connectedFile.name })];
+          }
+          // If it's a Discord attachment (from command input)
+          else if (connectedFile.url) {
+            const { AttachmentBuilder } = require('discord.js');
+            messageOptions.files = [connectedFile.url];
+          }
+        }
+
+        // For commands: use interaction.reply
+        // For event triggers: use channel.send
+        if (interaction) {
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply(messageOptions);
+          } else {
+            await interaction.followUp(messageOptions);
+          }
         } else {
-          await interaction.followUp(messageOptions);
+          // Event trigger - send to channel from context
+          const channel = dataContext.channel;
+          if (!channel) {
+            throw new Error('No channel available for sending message');
+          }
+          await channel.send(messageOptions);
         }
         break;
 
@@ -730,22 +1073,247 @@ class BotRunner {
         break;
 
       case 'join-voice':
-        const voiceChannel = this.getInputValue(flowData, node.id, 'channel', dataContext) || config.channelId;
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
 
-        // Note: Requires @discordjs/voice package for full implementation
-        this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
-        throw new Error('Voice join not implemented - requires @discordjs/voice package');
-        // Basic implementation would be:
-        // const { joinVoiceChannel } = require('@discordjs/voice');
-        // const connection = joinVoiceChannel({ ... });
+        const voiceChannel = this.getInputValue(flowData, node.id, 'channel', dataContext);
+
+        if (!voiceChannel) {
+          throw new Error('No voice channel specified');
+        }
+
+        if (!voiceChannel.isVoiceBased()) {
+          throw new Error(`${voiceChannel.name} is not a voice channel`);
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot join voice channel outside of a guild');
+        }
+
+        try {
+          const { joinVoiceChannel } = voiceModule;
+
+          // Check if already connected to this guild
+          const existingConnection = this.voiceConnections.get(interaction.guild.id);
+          if (existingConnection) {
+            existingConnection.destroy();
+          }
+
+          const connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: interaction.guild.id,
+            adapterCreator: interaction.guild.voiceAdapterCreator,
+          });
+
+          this.voiceConnections.set(interaction.guild.id, connection);
+          this.log('success', `Joined voice channel: ${voiceChannel.name}`);
+        } catch (error) {
+          throw new Error(`Failed to join voice channel: ${error.message}`);
+        }
         break;
 
       case 'leave-voice':
-        // Note: Requires @discordjs/voice package for full implementation
-        this.log('warning', 'Voice channel support requires @discordjs/voice package (not implemented yet)');
-        throw new Error('Voice leave not implemented - requires @discordjs/voice package');
-        // Basic implementation would be:
-        // connection.destroy();
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot leave voice channel outside of a guild');
+        }
+
+        const connection = this.voiceConnections.get(interaction.guild.id);
+        if (!connection) {
+          throw new Error('Not connected to any voice channel in this server');
+        }
+
+        try {
+          // Stop any playing audio first
+          const player = this.audioPlayers.get(interaction.guild.id);
+          if (player) {
+            player.stop();
+            this.audioPlayers.delete(interaction.guild.id);
+          }
+
+          connection.destroy();
+          this.voiceConnections.delete(interaction.guild.id);
+          this.log('success', 'Left voice channel');
+        } catch (error) {
+          throw new Error(`Failed to leave voice channel: ${error.message}`);
+        }
+        break;
+
+      case 'stream-file-voice':
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot stream audio outside of a guild');
+        }
+
+        const voiceConnection = this.voiceConnections.get(interaction.guild.id);
+        if (!voiceConnection) {
+          throw new Error('Not connected to any voice channel. Use "Join Voice Channel" first.');
+        }
+
+        try {
+          const { createAudioResource, createAudioPlayer, AudioPlayerStatus, VoiceConnectionStatus } = voiceModule;
+
+          // Get file input - either from ATTACHMENT or filename STRING
+          let fileToStream = this.getInputValue(flowData, node.id, 'file', dataContext);
+          const filenameInput = this.getInputValue(flowData, node.id, 'filename', dataContext);
+
+          let filePath;
+          if (fileToStream && fileToStream.path) {
+            // File object from Read File from Server or String to File
+            filePath = fileToStream.path;
+          } else if (filenameInput) {
+            // Filename string - look in server storage
+            filePath = path.join(this.filesPath, filenameInput);
+            if (!fs.existsSync(filePath)) {
+              throw new Error(`File not found: ${filenameInput}`);
+            }
+          } else {
+            throw new Error('No file specified. Connect a file or filename.');
+          }
+
+          // Stop any currently playing audio
+          let player = this.audioPlayers.get(interaction.guild.id);
+          if (player) {
+            player.stop();
+          } else {
+            player = createAudioPlayer();
+            this.audioPlayers.set(interaction.guild.id, player);
+          }
+
+          // Create audio resource from file
+          const resource = createAudioResource(filePath);
+
+          // Subscribe connection to player
+          voiceConnection.subscribe(player);
+
+          // Play the audio
+          player.play(resource);
+
+          // Log when finished playing
+          player.on(AudioPlayerStatus.Idle, () => {
+            this.log('info', 'Finished playing audio');
+          });
+
+          player.on('error', (error) => {
+            this.log('error', `Audio player error: ${error.message}`);
+          });
+
+          const filename = path.basename(filePath);
+          this.log('success', `Started streaming: ${filename}`);
+        } catch (error) {
+          throw new Error(`Failed to stream file: ${error.message}`);
+        }
+        break;
+
+      case 'stop-voice-stream':
+        if (!voiceModule) {
+          throw new Error('Voice support not available. Please install @discordjs/voice: npm install @discordjs/voice');
+        }
+
+        if (!interaction.guild) {
+          throw new Error('Cannot stop stream outside of a guild');
+        }
+
+        const audioPlayer = this.audioPlayers.get(interaction.guild.id);
+        if (!audioPlayer) {
+          throw new Error('No audio is currently playing');
+        }
+
+        try {
+          audioPlayer.stop();
+          this.log('success', 'Stopped audio stream');
+        } catch (error) {
+          throw new Error(`Failed to stop stream: ${error.message}`);
+        }
+        break;
+
+      // File operations
+      case 'save-file-to-server':
+        const saveFilename = this.getInputValue(flowData, node.id, 'filename', dataContext) || config.filename || 'file.txt';
+        const saveContent = this.getInputValue(flowData, node.id, 'content', dataContext) || '';
+
+        const saveSuccess = await this.saveFileToServer(saveFilename, saveContent);
+        if (!saveSuccess) {
+          throw new Error('Failed to save file to server');
+        }
+        this.log('success', `Saved file: ${saveFilename}`);
+        break;
+
+      case 'save-attachment-to-server':
+        const attachment = this.getInputValue(flowData, node.id, 'file', dataContext);
+        const attachmentFilename = this.getInputValue(flowData, node.id, 'filename', dataContext) || config.filename || attachment?.name || 'file.dat';
+
+        if (!attachment) {
+          throw new Error('No attachment provided');
+        }
+
+        try {
+          await this.downloadFile(attachment.url, attachmentFilename);
+          this.log('success', `Saved attachment: ${attachmentFilename}`);
+        } catch (error) {
+          throw new Error(`Failed to save attachment: ${error.message}`);
+        }
+        break;
+
+      // Variable operations
+      case 'set-variable-global':
+        const globalKey = this.getInputValue(flowData, node.id, 'key', dataContext) || config.key || '';
+        const globalValue = this.getInputValue(flowData, node.id, 'value', dataContext) || config.value || '';
+
+        if (!globalKey) {
+          throw new Error('Variable key is required');
+        }
+
+        const globalSetSuccess = await this.setVariable('global', null, globalKey, globalValue);
+        if (!globalSetSuccess) {
+          throw new Error('Failed to set global variable');
+        }
+        this.log('success', `Set global variable: ${globalKey} = ${globalValue}`);
+        break;
+
+      case 'set-variable-server':
+        const serverGuild = this.getInputValue(flowData, node.id, 'guild', dataContext) || interaction.guild;
+        const serverKey = this.getInputValue(flowData, node.id, 'key', dataContext) || config.key || '';
+        const serverValue = this.getInputValue(flowData, node.id, 'value', dataContext) || config.value || '';
+
+        if (!serverKey) {
+          throw new Error('Variable key is required');
+        }
+        if (!serverGuild) {
+          throw new Error('Guild context is required');
+        }
+
+        const serverSetSuccess = await this.setVariable('server', serverGuild.id, serverKey, serverValue);
+        if (!serverSetSuccess) {
+          throw new Error('Failed to set server variable');
+        }
+        this.log('success', `Set server variable: ${serverKey} = ${serverValue} (Server: ${serverGuild.name})`);
+        break;
+
+      case 'set-variable-user':
+        const userForVar = this.getInputValue(flowData, node.id, 'user', dataContext) || interaction.user;
+        const userKey = this.getInputValue(flowData, node.id, 'key', dataContext) || config.key || '';
+        const userValue = this.getInputValue(flowData, node.id, 'value', dataContext) || config.value || '';
+
+        if (!userKey) {
+          throw new Error('Variable key is required');
+        }
+        if (!userForVar) {
+          throw new Error('User context is required');
+        }
+
+        const userSetSuccess = await this.setVariable('user', userForVar.id, userKey, userValue);
+        if (!userSetSuccess) {
+          throw new Error('Failed to set user variable');
+        }
+        this.log('success', `Set user variable: ${userKey} = ${userValue} (User: ${userForVar.tag || userForVar.id})`);
         break;
 
       default:
@@ -996,6 +1564,146 @@ class BotRunner {
         output.timestamp = Math.floor(Date.now() / 1000); // Unix timestamp in seconds
         break;
 
+      // File operation data nodes
+      case 'get-file-name':
+        const fileForName = getUserInput('file');
+        output.name = fileForName?.name || '';
+        break;
+
+      case 'get-file-url':
+        const fileForUrl = getUserInput('file');
+        output.url = fileForUrl?.url || '';
+        break;
+
+      case 'get-file-size':
+        const fileForSize = getUserInput('file');
+        output.size = fileForSize?.size || 0;
+        break;
+
+      case 'read-file-from-url':
+        const fileUrl = getUserInput('url');
+        if (fileUrl) {
+          try {
+            const fileContent = await this.readFileFromURL(fileUrl);
+            output.content = fileContent;
+          } catch (error) {
+            this.log('error', `Failed to read file from URL: ${error.message}`);
+            output.content = '';
+          }
+        } else {
+          output.content = '';
+        }
+        break;
+
+      case 'read-file-from-server':
+        const filename = getUserInput('filename');
+        if (filename) {
+          const filepath = path.join(this.filesPath, filename);
+          if (fs.existsSync(filepath)) {
+            output.file = {
+              path: filepath,
+              name: filename,
+              size: fs.statSync(filepath).size
+            };
+          } else {
+            output.file = null;
+          }
+        } else {
+          output.file = null;
+        }
+        break;
+
+      case 'file-to-string':
+        const fileToRead = getUserInput('file');
+        if (fileToRead) {
+          // If it's a local file with path
+          if (fileToRead.path && fs.existsSync(fileToRead.path)) {
+            try {
+              output.content = fs.readFileSync(fileToRead.path, 'utf8');
+            } catch (error) {
+              this.log('error', `Failed to read file: ${error.message}`);
+              output.content = '';
+            }
+          }
+          // If it's a Discord attachment with URL
+          else if (fileToRead.url) {
+            try {
+              output.content = await this.readFileFromURL(fileToRead.url);
+            } catch (error) {
+              this.log('error', `Failed to read file from URL: ${error.message}`);
+              output.content = '';
+            }
+          } else {
+            output.content = '';
+          }
+        } else {
+          output.content = '';
+        }
+        break;
+
+      case 'string-to-file':
+        const contentToFile = getUserInput('content');
+        const filenameForFile = getUserInput('filename') || node.data.config?.filename || 'file.txt';
+
+        if (contentToFile && filenameForFile) {
+          // Create a temporary file
+          const tempFilePath = path.join(this.filesPath, `temp_${Date.now()}_${filenameForFile}`);
+          try {
+            fs.writeFileSync(tempFilePath, contentToFile, 'utf8');
+            output.file = {
+              path: tempFilePath,
+              name: filenameForFile,
+              size: Buffer.byteLength(contentToFile, 'utf8')
+            };
+          } catch (error) {
+            this.log('error', `Failed to create file: ${error.message}`);
+            output.file = null;
+          }
+        } else {
+          output.file = null;
+        }
+        break;
+
+      case 'check-file-exists':
+        const fileToCheck = getUserInput('filename');
+        if (fileToCheck) {
+          const checkFilePath = path.join(this.filesPath, fileToCheck);
+          output.exists = fs.existsSync(checkFilePath);
+        } else {
+          output.exists = false;
+        }
+        break;
+
+      // Variable data nodes
+      case 'get-variable-global':
+        const globalVarKey = getUserInput('key');
+        if (globalVarKey) {
+          output.value = await this.getVariable('global', null, globalVarKey);
+        } else {
+          output.value = '';
+        }
+        break;
+
+      case 'get-variable-server':
+        const serverVarGuild = getUserInput('guild');
+        const serverVarKey = getUserInput('key');
+        if (serverVarGuild && serverVarKey) {
+          output.value = await this.getVariable('server', serverVarGuild.id, serverVarKey);
+        } else {
+          output.value = '';
+        }
+        break;
+
+      case 'get-variable-user':
+        const userVarUser = getUserInput('user');
+        const userVarKey = getUserInput('key');
+        if (userVarUser && userVarKey) {
+          output.value = await this.getVariable('user', userVarUser.id, userVarKey);
+        } else {
+          output.value = '';
+        }
+        break;
+
       default:
         this.log('warning', `Unknown data node type: ${nodeType}`);
         break;
@@ -1012,6 +1720,33 @@ class BotRunner {
   stop() {
     if (this.client) {
       this.log('info', 'Stopping bot...');
+
+      // Stop all audio players
+      if (this.audioPlayers.size > 0) {
+        this.log('info', `Stopping ${this.audioPlayers.size} audio players...`);
+        for (const [guildId, player] of this.audioPlayers) {
+          try {
+            player.stop();
+          } catch (error) {
+            this.log('error', `Failed to stop audio player in guild ${guildId}: ${error.message}`);
+          }
+        }
+        this.audioPlayers.clear();
+      }
+
+      // Disconnect from all voice channels
+      if (this.voiceConnections.size > 0) {
+        this.log('info', `Disconnecting from ${this.voiceConnections.size} voice channels...`);
+        for (const [guildId, connection] of this.voiceConnections) {
+          try {
+            connection.destroy();
+          } catch (error) {
+            this.log('error', `Failed to disconnect from voice in guild ${guildId}: ${error.message}`);
+          }
+        }
+        this.voiceConnections.clear();
+      }
+
       this.client.destroy();
       this.client = null;
       this.isRunning = false;

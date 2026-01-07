@@ -22,12 +22,83 @@ const nodeTypes = {
   dataNode: DataNodeComponent,
 };
 
-// Trigger node (auto-added for commands)
-const TRIGGER_NODE = {
-  type: 'on-command-ran',
-  label: 'On Command Ran',
-  icon: '⚡',
-  color: '#5865f2',
+// Trigger configurations
+const TRIGGER_TYPES = {
+  command: {
+    type: 'on-command-ran',
+    label: 'On Command Ran',
+    icon: '⚡',
+    color: '#5865f2',
+  },
+  messageCreate: {
+    type: 'on-message-create',
+    label: 'On Message Sent',
+    icon: '💬',
+    color: '#5865f2',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'message', type: 'STRING', label: 'Message Content' },
+      { id: 'user', type: 'USER', label: 'Author' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
+  guildMemberAdd: {
+    type: 'on-member-join',
+    label: 'On Member Join',
+    icon: '👋',
+    color: '#57f287',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'New Member' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
+  guildMemberRemove: {
+    type: 'on-member-leave',
+    label: 'On Member Leave',
+    icon: '👋',
+    color: '#ed4245',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'Member' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
+  messageReactionAdd: {
+    type: 'on-reaction-add',
+    label: 'On Reaction Added',
+    icon: '👍',
+    color: '#faa61a',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'emoji', type: 'STRING', label: 'Emoji' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+    ],
+  },
+  messageDelete: {
+    type: 'on-message-delete',
+    label: 'On Message Deleted',
+    icon: '🗑️',
+    color: '#ed4245',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'content', type: 'STRING', label: 'Message Content' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+    ],
+  },
+  voiceStateUpdate: {
+    type: 'on-voice-state-update',
+    label: 'On Voice State Change',
+    icon: '🔊',
+    color: '#9b59b6',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
 };
 
 // Data converter nodes
@@ -404,6 +475,117 @@ const DATA_NODES = [
     outputs: [{ id: 'timestamp', type: 'NUMBER' }],
     tags: ['time', 'now', 'current', 'timestamp', 'unix', 'date'],
   },
+  // File operation nodes
+  {
+    type: 'get-file-name',
+    label: 'Get File Name',
+    icon: '📄',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'name', type: 'STRING' }],
+    tags: ['file', 'attachment', 'name', 'filename', 'upload'],
+  },
+  {
+    type: 'get-file-url',
+    label: 'Get File URL',
+    icon: '🔗',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'url', type: 'STRING' }],
+    tags: ['file', 'attachment', 'url', 'link', 'download'],
+  },
+  {
+    type: 'get-file-size',
+    label: 'Get File Size',
+    icon: '📊',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'size', type: 'NUMBER' }],
+    tags: ['file', 'attachment', 'size', 'bytes', 'length'],
+  },
+  {
+    type: 'read-file-from-url',
+    label: 'Read File from URL',
+    icon: '🌐',
+    color: '#9b59b6',
+    inputs: [{ id: 'url', type: 'STRING' }],
+    outputs: [{ id: 'content', type: 'STRING' }],
+    tags: ['file', 'read', 'url', 'http', 'download', 'fetch', 'web'],
+  },
+  {
+    type: 'read-file-from-server',
+    label: 'Read File from Server',
+    icon: '💾',
+    color: '#9b59b6',
+    inputs: [{ id: 'filename', type: 'STRING' }],
+    outputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    tags: ['file', 'read', 'server', 'storage', 'load', 'disk'],
+  },
+  {
+    type: 'file-to-string',
+    label: 'File to String',
+    icon: '📄',
+    color: '#9b59b6',
+    inputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    outputs: [{ id: 'content', type: 'STRING' }],
+    tags: ['file', 'convert', 'string', 'text', 'read', 'content'],
+  },
+  {
+    type: 'string-to-file',
+    label: 'String to File',
+    icon: '📝',
+    color: '#9b59b6',
+    inputs: [
+      { id: 'content', type: 'STRING' },
+      { id: 'filename', type: 'STRING' },
+    ],
+    outputs: [{ id: 'file', type: 'ATTACHMENT' }],
+    config: { filename: 'file.txt' },
+    tags: ['file', 'convert', 'string', 'text', 'create', 'make'],
+  },
+  {
+    type: 'check-file-exists',
+    label: 'Check File Exists',
+    icon: '🔍',
+    color: '#9b59b6',
+    inputs: [{ id: 'filename', type: 'STRING' }],
+    outputs: [{ id: 'exists', type: 'BOOLEAN' }],
+    tags: ['file', 'check', 'exists', 'find', 'search', 'server', 'storage'],
+  },
+  // Variable nodes - Get
+  {
+    type: 'get-variable-global',
+    label: 'Get Variable (Global)',
+    icon: '🌍',
+    color: '#e67e22',
+    inputs: [{ id: 'key', type: 'STRING' }],
+    outputs: [{ id: 'value', type: 'STRING' }],
+    tags: ['variable', 'get', 'load', 'global', 'storage', 'data', 'retrieve'],
+  },
+  {
+    type: 'get-variable-server',
+    label: 'Get Variable (Server)',
+    icon: '🏰',
+    color: '#e67e22',
+    inputs: [
+      { id: 'guild', type: 'GUILD' },
+      { id: 'key', type: 'STRING' },
+    ],
+    outputs: [{ id: 'value', type: 'STRING' }],
+    tags: ['variable', 'get', 'load', 'server', 'guild', 'storage', 'data', 'retrieve'],
+  },
+  {
+    type: 'get-variable-user',
+    label: 'Get Variable (User)',
+    icon: '👤',
+    color: '#e67e22',
+    inputs: [
+      { id: 'user', type: 'USER' },
+      { id: 'key', type: 'STRING' },
+    ],
+    outputs: [{ id: 'value', type: 'STRING' }],
+    tags: ['variable', 'get', 'load', 'user', 'member', 'storage', 'data', 'retrieve', 'player'],
+  },
 ];
 
 // Action types available
@@ -417,12 +599,13 @@ const ACTION_TYPES = [
     inputs: [
       { id: 'flow', type: 'FLOW' },
       { id: 'content', type: 'STRING', optional: true },
+      { id: 'file', type: 'ATTACHMENT', optional: true },
     ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
-    tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk'],
+    tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk', 'image', 'attachment'],
   },
   {
     type: 'embed',
@@ -663,6 +846,36 @@ const ACTION_TYPES = [
     ],
     tags: ['voice', 'vc', 'deafen', 'deaf', 'audio', 'moderate'],
   },
+  {
+    type: 'stream-file-voice',
+    label: 'Stream File in Voice',
+    icon: '🎵',
+    color: '#9b59b6',
+    defaultData: {},
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'file', type: 'ATTACHMENT', optional: true },
+      { id: 'filename', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['voice', 'vc', 'stream', 'play', 'audio', 'video', 'music', 'sound', 'mp3', 'mp4'],
+  },
+  {
+    type: 'stop-voice-stream',
+    label: 'Stop Voice Stream',
+    icon: '⏹️',
+    color: '#ed4245',
+    defaultData: {},
+    inputs: [{ id: 'flow', type: 'FLOW' }],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['voice', 'vc', 'stop', 'pause', 'audio', 'music'],
+  },
   // Message/Channel Actions
   {
     type: 'delete-message',
@@ -722,16 +935,109 @@ const ACTION_TYPES = [
     ],
     tags: ['branch', 'if', 'condition', 'check', 'conditional', 'split', 'decision'],
   },
+  // File operation actions
+  {
+    type: 'save-file-to-server',
+    label: 'Save File to Server',
+    icon: '💾',
+    color: '#9b59b6',
+    defaultData: { filename: 'file.txt' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'filename', type: 'STRING', optional: true },
+      { id: 'content', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'save', 'write', 'server', 'storage', 'disk', 'upload'],
+  },
+  {
+    type: 'save-attachment-to-server',
+    label: 'Save Attachment to Server',
+    icon: '📥',
+    color: '#9b59b6',
+    defaultData: { filename: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'file', type: 'ATTACHMENT' },
+      { id: 'filename', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'save', 'download', 'attachment', 'server', 'storage', 'disk'],
+  },
+  // Variable operation actions
+  {
+    type: 'set-variable-global',
+    label: 'Set Variable (Global)',
+    icon: '🌍',
+    color: '#e67e22',
+    defaultData: { key: '', value: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'key', type: 'STRING', optional: true },
+      { id: 'value', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['variable', 'set', 'save', 'global', 'storage', 'data', 'store', 'write'],
+  },
+  {
+    type: 'set-variable-server',
+    label: 'Set Variable (Server)',
+    icon: '🏰',
+    color: '#e67e22',
+    defaultData: { key: '', value: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'guild', type: 'GUILD', optional: true },
+      { id: 'key', type: 'STRING', optional: true },
+      { id: 'value', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['variable', 'set', 'save', 'server', 'guild', 'storage', 'data', 'store', 'write'],
+  },
+  {
+    type: 'set-variable-user',
+    label: 'Set Variable (User)',
+    icon: '👤',
+    color: '#e67e22',
+    defaultData: { key: '', value: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'user', type: 'USER', optional: true },
+      { id: 'key', type: 'STRING', optional: true },
+      { id: 'value', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['variable', 'set', 'save', 'user', 'member', 'storage', 'data', 'store', 'write', 'player', 'money', 'balance'],
+  },
 ];
 
-function FlowEventEditor({ event, onSave, onClose }) {
+function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const [eventConfig, setEventConfig] = useState(
     event || {
-      type: 'command',
+      type: eventType || 'command',
       name: '',
       description: '',
+      triggerType: eventType === 'event' ? 'messageCreate' : undefined,
       flowData: { nodes: [], edges: [] },
     }
+  );
+  const [showTriggerSelector, setShowTriggerSelector] = useState(
+    eventType === 'event' && !event
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(eventConfig.flowData?.nodes || []);
@@ -762,29 +1068,45 @@ function FlowEventEditor({ event, onSave, onClose }) {
   // Auto-add trigger node if it doesn't exist
   useEffect(() => {
     if (nodes.length === 0 || !nodes.find(n => n.type === 'triggerNode')) {
-      const baseOutputs = [
-        { id: 'flow', type: 'FLOW', label: 'Flow' },
-        { id: 'user', type: 'USER', label: 'User' },
-        { id: 'channel', type: 'CHANNEL', label: 'Channel' },
-        { id: 'guild', type: 'GUILD', label: 'Guild' },
-      ];
+      // Get trigger config based on event type
+      let triggerConfig;
+      if (eventConfig.type === 'command') {
+        triggerConfig = TRIGGER_TYPES.command;
+      } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+      } else {
+        triggerConfig = TRIGGER_TYPES.command;
+      }
 
-      // Add command options as outputs
-      const optionOutputs = (eventConfig.options || []).map(option => ({
-        id: `option-${option.name}`,
-        type: option.type,
-        label: option.name,
-      }));
+      let outputs;
+      if (eventConfig.type === 'command') {
+        // Command triggers have base outputs + options
+        const baseOutputs = [
+          { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'user', type: 'USER', label: 'User' },
+          { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+          { id: 'guild', type: 'GUILD', label: 'Guild' },
+        ];
+        const optionOutputs = (eventConfig.options || []).map(option => ({
+          id: `option-${option.name}`,
+          type: option.type,
+          label: option.name,
+        }));
+        outputs = [...baseOutputs, ...optionOutputs];
+      } else {
+        // Event triggers have predefined outputs
+        outputs = triggerConfig.outputs || [];
+      }
 
       const triggerNode = {
         id: 'trigger-node',
         type: 'triggerNode',
         position: { x: 250, y: 50 },
         data: {
-          label: TRIGGER_NODE.label,
-          icon: TRIGGER_NODE.icon,
-          color: TRIGGER_NODE.color,
-          outputs: [...baseOutputs, ...optionOutputs],
+          label: triggerConfig.label,
+          icon: triggerConfig.icon,
+          color: triggerConfig.color,
+          outputs: outputs,
         },
         draggable: false,
       };
@@ -792,37 +1114,50 @@ function FlowEventEditor({ event, onSave, onClose }) {
     }
   }, []);
 
-  // Update trigger node outputs when command options change
+  // Update trigger node outputs when config changes
   useEffect(() => {
     const triggerNode = nodes.find(n => n.type === 'triggerNode');
     if (triggerNode) {
-      const baseOutputs = [
-        { id: 'flow', type: 'FLOW', label: 'Flow' },
-        { id: 'user', type: 'USER', label: 'User' },
-        { id: 'channel', type: 'CHANNEL', label: 'Channel' },
-        { id: 'guild', type: 'GUILD', label: 'Guild' },
-      ];
+      // Get trigger config based on event type
+      let triggerConfig;
+      let newOutputs;
 
-      // Add command options as outputs
-      const optionOutputs = (eventConfig.options || []).map(option => ({
-        id: `option-${option.name}`,
-        type: option.type,
-        label: option.name,
-      }));
+      if (eventConfig.type === 'command') {
+        triggerConfig = TRIGGER_TYPES.command;
+        const baseOutputs = [
+          { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'user', type: 'USER', label: 'User' },
+          { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+          { id: 'guild', type: 'GUILD', label: 'Guild' },
+        ];
+        const optionOutputs = (eventConfig.options || []).map(option => ({
+          id: `option-${option.name}`,
+          type: option.type,
+          label: option.name,
+        }));
+        newOutputs = [...baseOutputs, ...optionOutputs];
+      } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+        newOutputs = triggerConfig.outputs || [];
+      } else {
+        return; // No valid config
+      }
 
-      const newOutputs = [...baseOutputs, ...optionOutputs];
-
-      // Only update if outputs actually changed
+      // Only update if outputs or label actually changed
       const currentOutputs = triggerNode.data.outputs || [];
       const outputsChanged = JSON.stringify(currentOutputs) !== JSON.stringify(newOutputs);
+      const labelChanged = triggerNode.data.label !== triggerConfig.label;
 
-      if (outputsChanged) {
+      if (outputsChanged || labelChanged) {
         setNodes(nodes.map(node =>
           node.id === 'trigger-node'
             ? {
                 ...node,
                 data: {
                   ...node.data,
+                  label: triggerConfig.label,
+                  icon: triggerConfig.icon,
+                  color: triggerConfig.color,
                   outputs: newOutputs,
                 },
               }
@@ -830,7 +1165,7 @@ function FlowEventEditor({ event, onSave, onClose }) {
         ));
       }
     }
-  }, [eventConfig.options, nodes, setNodes]);
+  }, [eventConfig.type, eventConfig.triggerType, eventConfig.options, nodes, setNodes]);
 
   const detectLoops = useCallback((currentEdges) => {
     const adjacency = {};
@@ -1052,9 +1387,84 @@ function FlowEventEditor({ event, onSave, onClose }) {
     [setNodes, setEdges]
   );
 
+  // Keyboard shortcuts (UE5-style)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Get selected nodes
+      const selectedNodes = nodes.filter((node) => node.selected);
+
+      // Delete key - delete selected nodes
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNodes.length > 0 && !e.target.matches('input, textarea')) {
+          e.preventDefault();
+          selectedNodes.forEach((node) => {
+            if (node.id !== 'trigger-node') {
+              deleteNode(node.id);
+            }
+          });
+        }
+      }
+
+      // Ctrl/Cmd + S - save
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+
+      // Ctrl/Cmd + F - focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        const searchInput = document.querySelector('.search-input');
+        if (searchInput) searchInput.focus();
+      }
+
+      // Escape - deselect all and clear search
+      if (e.key === 'Escape') {
+        if (searchTerm) {
+          setSearchTerm('');
+        } else {
+          setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+          setSelectedNode(null);
+        }
+      }
+
+      // Ctrl/Cmd + D - duplicate selected node
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd' && selectedNodes.length === 1) {
+        e.preventDefault();
+        const node = selectedNodes[0];
+        if (node.id !== 'trigger-node') {
+          const newNode = {
+            ...node,
+            id: `${node.type}-${Date.now()}`,
+            position: {
+              x: node.position.x + 50,
+              y: node.position.y + 50,
+            },
+            selected: false,
+          };
+          setNodes((nds) => [...nds, newNode]);
+        }
+      }
+
+      // Ctrl/Cmd + A - select all nodes
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !e.target.matches('input, textarea')) {
+        e.preventDefault();
+        setNodes((nds) => nds.map((n) => ({ ...n, selected: true })));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, deleteNode, searchTerm, setNodes, setSearchTerm, setSelectedNode]);
+
   const handleSave = () => {
     if (eventConfig.type === 'command' && !eventConfig.name) {
       alert('Please enter a command name');
+      return;
+    }
+
+    if (eventConfig.type === 'event' && !eventConfig.triggerType) {
+      alert('Please select a trigger type');
       return;
     }
 
@@ -1066,6 +1476,86 @@ function FlowEventEditor({ event, onSave, onClose }) {
     onClose();
   };
 
+  const handleSelectTrigger = (triggerKey) => {
+    setEventConfig({ ...eventConfig, triggerType: triggerKey });
+    setShowTriggerSelector(false);
+  };
+
+  // Trigger type options for event triggers
+  const TRIGGER_OPTIONS = [
+    {
+      key: 'messageCreate',
+      label: 'On Message Sent',
+      icon: '💬',
+      description: 'Triggers when any user sends a message in the server',
+      color: '#5865f2',
+    },
+    {
+      key: 'guildMemberAdd',
+      label: 'On Member Join',
+      icon: '👋',
+      description: 'Triggers when someone joins the server',
+      color: '#57f287',
+    },
+    {
+      key: 'guildMemberRemove',
+      label: 'On Member Leave',
+      icon: '👋',
+      description: 'Triggers when someone leaves the server',
+      color: '#ed4245',
+    },
+    {
+      key: 'messageReactionAdd',
+      label: 'On Reaction Added',
+      icon: '👍',
+      description: 'Triggers when someone reacts to a message',
+      color: '#faa61a',
+    },
+    {
+      key: 'messageDelete',
+      label: 'On Message Deleted',
+      icon: '🗑️',
+      description: 'Triggers when a message is deleted',
+      color: '#ed4245',
+    },
+    {
+      key: 'voiceStateUpdate',
+      label: 'On Voice State Change',
+      icon: '🔊',
+      description: 'Triggers when voice state changes (join/leave/mute)',
+      color: '#9b59b6',
+    },
+  ];
+
+  if (showTriggerSelector) {
+    return (
+      <Modal isOpen={true} onClose={onClose} title="Choose Event Trigger" className="flow-editor-modal">
+        <div className="event-type-selector">
+          <div className="selector-header">
+            <h2>Choose a Trigger Type</h2>
+            <p style={{ color: '#b5bac1', fontSize: '14px', marginTop: '8px' }}>
+              Select what Discord event should trigger your bot's actions
+            </p>
+          </div>
+          <div className="event-types-grid">
+            {TRIGGER_OPTIONS.map((trigger) => (
+              <div
+                key={trigger.key}
+                className="event-type-card"
+                onClick={() => handleSelectTrigger(trigger.key)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="event-type-icon" style={{ fontSize: '48px' }}>{trigger.icon}</div>
+                <h3>{trigger.label}</h3>
+                <p>{trigger.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal isOpen={true} onClose={onClose} title={event ? 'Edit Event' : 'Create New Event'} className="flow-editor-modal">
       <div className="flow-editor-container">
@@ -1076,10 +1566,41 @@ function FlowEventEditor({ event, onSave, onClose }) {
             <div className="form-group">
               <label>Event Type</label>
               <div className="event-type-badge">
-                <span className="event-icon">⚡</span>
-                <span>Command</span>
+                <span className="event-icon">{eventConfig.type === 'command' ? '⚡' : '🎯'}</span>
+                <span>{eventConfig.type === 'command' ? 'Command' : 'Event Trigger'}</span>
               </div>
             </div>
+
+            {eventConfig.type === 'event' && (
+              <>
+                <div className="form-group">
+                  <label>Trigger Type</label>
+                  <div className="event-type-badge" style={{
+                    padding: '12px',
+                    background: '#2b2d31',
+                    borderRadius: '6px',
+                    border: '1px solid #383a40',
+                  }}>
+                    <span className="event-icon" style={{ fontSize: '24px', marginRight: '12px' }}>
+                      {TRIGGER_OPTIONS.find(t => t.key === eventConfig.triggerType)?.icon || '🎯'}
+                    </span>
+                    <span style={{ fontSize: '14px', fontWeight: '500' }}>
+                      {TRIGGER_OPTIONS.find(t => t.key === eventConfig.triggerType)?.label || 'Event Trigger'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Description (Optional)</label>
+                  <input
+                    type="text"
+                    value={eventConfig.description || ''}
+                    onChange={(e) => setEventConfig({ ...eventConfig, description: e.target.value })}
+                    placeholder="Describe what this event does..."
+                  />
+                </div>
+              </>
+            )}
 
             {eventConfig.type === 'command' && (
               <>
@@ -1134,6 +1655,7 @@ function FlowEventEditor({ event, onSave, onClose }) {
                           <option value="USER">User</option>
                           <option value="CHANNEL">Channel</option>
                           <option value="ROLE">Role</option>
+                          <option value="ATTACHMENT">File</option>
                         </select>
                         <label style={{ marginRight: '8px', fontSize: '12px', display: 'flex', alignItems: 'center' }}>
                           <input
@@ -1268,9 +1790,10 @@ function FlowEventEditor({ event, onSave, onClose }) {
 
         <div className="flow-editor-canvas">
           <div className="canvas-info">
-            <span>📍 Drag nodes to position</span>
-            <span>🔗 Connect colored handles by type</span>
-            <span>🗑️ Select node and press Delete</span>
+            <span>📍 Drag to move • Scroll to zoom • Click handles to connect</span>
+            <span style={{ borderLeft: '1px solid #505050', paddingLeft: '20px', marginLeft: '10px' }}>
+              ⌨️ <strong>Del</strong>: Delete • <strong>Ctrl+S</strong>: Save • <strong>Ctrl+D</strong>: Duplicate • <strong>Ctrl+F</strong>: Search • <strong>Ctrl+A</strong>: Select All
+            </span>
           </div>
           <ReactFlow
             nodes={nodes}
@@ -1282,12 +1805,23 @@ function FlowEventEditor({ event, onSave, onClose }) {
             nodeTypes={nodeTypes}
             fitView
             attributionPosition="bottom-right"
+            selectNodesOnDrag={false}
+            selectionOnDrag={true}
+            panOnDrag={[1, 2]}
+            selectionKeyCode="Shift"
+            multiSelectionKeyCode="Control"
+            deleteKeyCode="Delete"
+            zoomOnScroll={true}
+            zoomOnPinch={true}
+            panOnScroll={false}
+            elevateNodesOnSelect={true}
           >
-            <Background color="#383a40" gap={16} />
+            <Background color="#505050" gap={25} size={1} />
             <Controls />
             <MiniMap
-              nodeColor={(node) => node.data.color || '#5865f2'}
-              maskColor="rgba(0, 0, 0, 0.6)"
+              nodeColor={(node) => node.data.color || '#1565c0'}
+              maskColor="rgba(0, 0, 0, 0.7)"
+              style={{ background: '#1a1a1a', border: '1px solid #404040' }}
             />
           </ReactFlow>
         </div>
