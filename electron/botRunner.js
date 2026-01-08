@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const { app } = require('electron');
 
 // Configure FFmpeg BEFORE loading @discordjs/voice
 let ffmpegPath = null;
@@ -10,39 +11,76 @@ try {
   // Use ffmpeg-static which includes platform-specific binaries
   const rawPath = require('ffmpeg-static');
   if (rawPath) {
-    // Handle Electron ASAR packaging - ffmpeg needs to be unpacked
-    const correctedPath = rawPath.replace('app.asar', 'app.asar.unpacked');
-    ffmpegPath = correctedPath; // Update the variable to use corrected path
-
-    // Set env var for @discordjs/voice / prism-media
-    process.env.FFMPEG_PATH = correctedPath;
-
-    // Diagnostic logging
-    const ffmpegExists = fs.existsSync(correctedPath);
     console.log(`[Voice] ========== FFmpeg Configuration ==========`);
     console.log(`[Voice] Raw path from ffmpeg-static: ${rawPath}`);
-    console.log(`[Voice] Corrected path (ASAR unpacked): ${correctedPath}`);
-    console.log(`[Voice] File exists at corrected path: ${ffmpegExists}`);
-    console.log(`[Voice] FFMPEG_PATH env var set to: ${process.env.FFMPEG_PATH}`);
 
-    if (!ffmpegExists) {
-      console.error(`[Voice] ❌ WARNING: FFmpeg binary not found at unpacked path!`);
-      console.error(`[Voice] This usually means electron-builder failed to unpack the binary.`);
-      console.error(`[Voice] Checking if file exists at original path: ${fs.existsSync(rawPath)}`);
+    // Try ASAR unpacked path first
+    const unpackedPath = rawPath.replace('app.asar', 'app.asar.unpacked');
+    const rawPathExists = fs.existsSync(rawPath);
+    const unpackedPathExists = fs.existsSync(unpackedPath);
 
-      // Fallback: try using the raw path even though it's in ASAR
-      if (fs.existsSync(rawPath)) {
-        console.warn(`[Voice] Found FFmpeg at ASAR path, using as fallback (may not work)`);
-        ffmpegPath = rawPath;
-        process.env.FFMPEG_PATH = rawPath;
-      }
+    console.log(`[Voice] File exists at raw path (in ASAR): ${rawPathExists}`);
+    console.log(`[Voice] File exists at unpacked path: ${unpackedPathExists}`);
+
+    // If neither path works, copy FFmpeg to app data directory
+    if (!unpackedPathExists && !rawPathExists) {
+      console.error(`[Voice] ❌ FFmpeg not found at any expected location!`);
+      throw new Error('FFmpeg binary not found');
     }
+
+    // Determine source path (prefer unpacked, fallback to raw)
+    const sourcePath = unpackedPathExists ? unpackedPath : rawPath;
+
+    // Copy FFmpeg to app data directory for reliable access
+    const userDataPath = app.getPath('userData');
+    const ffmpegDir = path.join(userDataPath, 'ffmpeg');
+    const ffmpegFileName = path.basename(rawPath);
+    const targetPath = path.join(ffmpegDir, ffmpegFileName);
+
+    console.log(`[Voice] App data directory: ${userDataPath}`);
+    console.log(`[Voice] Target FFmpeg path: ${targetPath}`);
+
+    // Create ffmpeg directory if it doesn't exist
+    if (!fs.existsSync(ffmpegDir)) {
+      fs.mkdirSync(ffmpegDir, { recursive: true });
+      console.log(`[Voice] Created FFmpeg directory: ${ffmpegDir}`);
+    }
+
+    // Copy FFmpeg if not already present or if source is newer
+    let needsCopy = !fs.existsSync(targetPath);
+    if (!needsCopy) {
+      // Check if source is newer than target
+      const sourceStats = fs.statSync(sourcePath);
+      const targetStats = fs.statSync(targetPath);
+      needsCopy = sourceStats.mtime > targetStats.mtime;
+    }
+
+    if (needsCopy) {
+      console.log(`[Voice] Copying FFmpeg from ${sourcePath} to ${targetPath}...`);
+      fs.copyFileSync(sourcePath, targetPath);
+      // Set executable permissions on Unix-like systems
+      if (process.platform !== 'win32') {
+        fs.chmodSync(targetPath, 0o755);
+      }
+      console.log(`[Voice] ✅ FFmpeg copied successfully`);
+    } else {
+      console.log(`[Voice] FFmpeg already exists at target path`);
+    }
+
+    // Use the copied version
+    ffmpegPath = targetPath;
+    process.env.FFMPEG_PATH = targetPath;
+
+    console.log(`[Voice] Final FFmpeg path: ${ffmpegPath}`);
+    console.log(`[Voice] File exists at final path: ${fs.existsSync(ffmpegPath)}`);
+    console.log(`[Voice] FFMPEG_PATH env var set to: ${process.env.FFMPEG_PATH}`);
   } else {
     console.error('[Voice] ffmpeg-static returned null path!');
   }
 } catch (ffmpegError) {
-  console.error('[Voice] Error loading ffmpeg-static:', ffmpegError.message);
-  console.warn('[Voice] ffmpeg-static not installed. Voice streaming may not work.');
+  console.error('[Voice] Error configuring FFmpeg:', ffmpegError.message);
+  console.error('[Voice] Stack trace:', ffmpegError.stack);
+  console.warn('[Voice] FFmpeg not available. Voice streaming will not work.');
 }
 
 // Try to load @discordjs/voice AFTER setting FFmpeg path
