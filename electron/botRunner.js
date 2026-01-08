@@ -8,21 +8,41 @@ const http = require('http');
 let ffmpegPath = null;
 try {
   // Use ffmpeg-static which includes platform-specific binaries
-  ffmpegPath = require('ffmpeg-static');
-  if (ffmpegPath) {
-    // ffmpeg-static returns the path directly
-    // Handle Electron ASAR packaging
-    const correctedPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+  const rawPath = require('ffmpeg-static');
+  if (rawPath) {
+    // Handle Electron ASAR packaging - ffmpeg needs to be unpacked
+    const correctedPath = rawPath.replace('app.asar', 'app.asar.unpacked');
+    ffmpegPath = correctedPath; // Update the variable to use corrected path
+
+    // Set env var for @discordjs/voice / prism-media
     process.env.FFMPEG_PATH = correctedPath;
-    console.log(`[Voice] FFmpeg path from ffmpeg-static: ${ffmpegPath}`);
-    console.log(`[Voice] FFmpeg path set in env: ${correctedPath}`);
-    console.log(`[Voice] FFmpeg exists at path: ${fs.existsSync(correctedPath)}`);
+
+    // Diagnostic logging
+    const ffmpegExists = fs.existsSync(correctedPath);
+    console.log(`[Voice] ========== FFmpeg Configuration ==========`);
+    console.log(`[Voice] Raw path from ffmpeg-static: ${rawPath}`);
+    console.log(`[Voice] Corrected path (ASAR unpacked): ${correctedPath}`);
+    console.log(`[Voice] File exists at corrected path: ${ffmpegExists}`);
+    console.log(`[Voice] FFMPEG_PATH env var set to: ${process.env.FFMPEG_PATH}`);
+
+    if (!ffmpegExists) {
+      console.error(`[Voice] ❌ WARNING: FFmpeg binary not found at unpacked path!`);
+      console.error(`[Voice] This usually means electron-builder failed to unpack the binary.`);
+      console.error(`[Voice] Checking if file exists at original path: ${fs.existsSync(rawPath)}`);
+
+      // Fallback: try using the raw path even though it's in ASAR
+      if (fs.existsSync(rawPath)) {
+        console.warn(`[Voice] Found FFmpeg at ASAR path, using as fallback (may not work)`);
+        ffmpegPath = rawPath;
+        process.env.FFMPEG_PATH = rawPath;
+      }
+    }
   } else {
     console.error('[Voice] ffmpeg-static returned null path!');
   }
 } catch (ffmpegError) {
   console.error('[Voice] Error loading ffmpeg-static:', ffmpegError.message);
-  console.warn('[Voice] ffmpeg-static not installed. Voice streaming may not work. Run: npm install ffmpeg-static');
+  console.warn('[Voice] ffmpeg-static not installed. Voice streaming may not work.');
 }
 
 // Try to load @discordjs/voice AFTER setting FFmpeg path
