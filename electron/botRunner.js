@@ -7,11 +7,16 @@ const http = require('http');
 // Configure FFmpeg BEFORE loading @discordjs/voice
 let ffmpegPath = null;
 try {
-  ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-  process.env.FFMPEG_PATH = ffmpegPath;
-  console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
+  // Use ffmpeg-static which includes platform-specific binaries
+  ffmpegPath = require('ffmpeg-static');
+  if (ffmpegPath) {
+    // ffmpeg-static returns the path directly
+    // Handle Electron ASAR packaging
+    process.env.FFMPEG_PATH = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+    console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
+  }
 } catch (ffmpegError) {
-  console.warn('[Voice] @ffmpeg-installer/ffmpeg not installed. Voice streaming may not work. Run: npm install @ffmpeg-installer/ffmpeg');
+  console.warn('[Voice] ffmpeg-static not installed. Voice streaming may not work. Run: npm install ffmpeg-static');
 }
 
 // Try to load @discordjs/voice AFTER setting FFmpeg path
@@ -1232,7 +1237,7 @@ class BotRunner {
 
           // Verify FFmpeg is available
           if (!ffmpegPath) {
-            throw new Error('FFmpeg not found. Please install: npm install @ffmpeg-installer/ffmpeg');
+            throw new Error('FFmpeg not found. Please install: npm install ffmpeg-static');
           }
 
           // Stop any currently playing audio

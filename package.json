@@ -21,7 +21,11 @@
     },
     "files": [
       "electron/**/*",
-      "dist/**/*"
+      "dist/**/*",
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**/*"
     ],
     "win": {
       "target": [
@@ -57,8 +61,8 @@
   "license": "MIT",
   "dependencies": {
     "@discordjs/voice": "^0.16.1",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "discord.js": "^14.14.1",
+    "ffmpeg-static": "^5.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "reactflow": "^11.10.4"
