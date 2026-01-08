@@ -12,10 +12,16 @@ try {
   if (ffmpegPath) {
     // ffmpeg-static returns the path directly
     // Handle Electron ASAR packaging
-    process.env.FFMPEG_PATH = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
-    console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
+    const correctedPath = ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+    process.env.FFMPEG_PATH = correctedPath;
+    console.log(`[Voice] FFmpeg path from ffmpeg-static: ${ffmpegPath}`);
+    console.log(`[Voice] FFmpeg path set in env: ${correctedPath}`);
+    console.log(`[Voice] FFmpeg exists at path: ${fs.existsSync(correctedPath)}`);
+  } else {
+    console.error('[Voice] ffmpeg-static returned null path!');
   }
 } catch (ffmpegError) {
+  console.error('[Voice] Error loading ffmpeg-static:', ffmpegError.message);
   console.warn('[Voice] ffmpeg-static not installed. Voice streaming may not work. Run: npm install ffmpeg-static');
 }
 
@@ -23,7 +29,9 @@ try {
 let voiceModule = null;
 try {
   voiceModule = require('@discordjs/voice');
+  console.log('[Voice] @discordjs/voice loaded successfully');
 } catch (error) {
+  console.error('[Voice] Error loading @discordjs/voice:', error.message);
   console.warn('[@discordjs/voice] not installed. Voice features will be disabled. Run: npm install @discordjs/voice');
 }
 
@@ -1237,8 +1245,11 @@ class BotRunner {
 
           // Verify FFmpeg is available
           if (!ffmpegPath) {
-            throw new Error('FFmpeg not found. Please install: npm install ffmpeg-static');
+            throw new Error('FFmpeg not found. ffmpeg-static may not be installed. Please reinstall: npm install ffmpeg-static');
           }
+
+          this.log('info', `Using FFmpeg at: ${ffmpegPath}`);
+          this.log('info', `FFMPEG_PATH env var: ${process.env.FFMPEG_PATH}`);
 
           // Stop any currently playing audio
           let player = this.audioPlayers.get(interaction.guild.id);
