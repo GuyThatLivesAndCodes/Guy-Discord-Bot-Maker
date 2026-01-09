@@ -4,6 +4,8 @@ const path = require('path');
 const https = require('https');
 const http = require('http');
 const { app } = require('electron');
+const { spawn } = require('child_process');
+const { Client: SSHClient } = require('ssh2');
 
 // FFmpeg configuration - runs lazily on first access
 let ffmpegPath = null;
@@ -111,6 +113,8 @@ class BotRunner {
     this.isRunning = false;
     this.voiceConnections = new Map(); // Store voice connections per guild
     this.audioPlayers = new Map(); // Store audio players per guild
+    this.processes = new Map(); // Store running processes by ID
+    this.sshConnections = new Map(); // Store SSH connections by config hash
 
     // Initialize storage directories
     this.storagePath = path.join(process.cwd(), 'bot-storage', this.botId);
@@ -174,6 +178,34 @@ class BotRunner {
       this.log('error', `Failed to get variable: ${error.message}`);
       return '';
     }
+  }
+
+  // SSH operations
+  async executeSSHCommand(sshConfig, command) {
+    return new Promise((resolve, reject) => {
+      const conn = new SSHClient();
+      let output = '';
+
+      conn.on('ready', () => {
+        conn.exec(command, (err, stream) => {
+          if (err) {
+            conn.end();
+            return reject(err);
+          }
+
+          stream.on('close', (code, signal) => {
+            conn.end();
+            resolve(output);
+          }).on('data', (data) => {
+            output += data.toString();
+          }).stderr.on('data', (data) => {
+            output += data.toString();
+          });
+        });
+      }).on('error', (err) => {
+        reject(err);
+      }).connect(sshConfig);
+    });
   }
 
   // File operations
@@ -1463,6 +1495,230 @@ class BotRunner {
           throw new Error('Failed to set user variable');
         }
         this.log('success', `Set user variable: ${userKey} = ${userValue} (User: ${userForVar.tag || userForVar.id})`);
+        break;
+
+      // System Management Actions
+      case 'ssh-execute':
+        const sshCommand = this.getInputValue(flowData, node.id, 'command', dataContext) || config.command;
+        const sshConfig = {
+          host: config.host,
+          port: config.port || 22,
+          username: config.username,
+          password: config.password,
+          privateKey: config.usePrivateKey ? fs.readFileSync(config.privateKey) : undefined
+        };
+
+        if (!sshConfig.host || !sshConfig.username) {
+          throw new Error('SSH host and username are required');
+        }
+
+        const sshOutput = await this.executeSSHCommand(sshConfig, sshCommand);
+        dataContext[`${node.id}_output`] = sshOutput;
+        this.log('success', `SSH command executed: ${sshCommand.substring(0, 50)}...`);
+        break;
+
+      case 'file-read':
+        const readPath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path;
+        if (!readPath) {
+          throw new Error('File path is required');
+        }
+
+        let readContent;
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          readContent = fs.readFileSync(readPath, 'utf8');
+        }
+
+        dataContext[`${node.id}_content`] = readContent;
+        this.log('success', `Read file: ${readPath}`);
+        break;
+
+      case 'file-write':
+        const writePath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path;
+        const writeContent = this.getInputValue(flowData, node.id, 'content', dataContext) || config.content;
+
+        if (!writePath) {
+          throw new Error('File path is required');
+        }
+
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          // Ensure directory exists
+          const writeDir = path.dirname(writePath);
+          if (!fs.existsSync(writeDir)) {
+            fs.mkdirSync(writeDir, { recursive: true });
+          }
+          fs.writeFileSync(writePath, writeContent || '', 'utf8');
+        }
+
+        this.log('success', `Wrote file: ${writePath}`);
+        break;
+
+      case 'file-delete':
+        const deletePath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path;
+        if (!deletePath) {
+          throw new Error('File path is required');
+        }
+
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          if (fs.existsSync(deletePath)) {
+            fs.unlinkSync(deletePath);
+          } else {
+            throw new Error(`File not found: ${deletePath}`);
+          }
+        }
+
+        this.log('success', `Deleted file: ${deletePath}`);
+        break;
+
+      case 'directory-list':
+        const listPath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path || '.';
+
+        let fileList;
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          if (!fs.existsSync(listPath)) {
+            throw new Error(`Directory not found: ${listPath}`);
+          }
+          const files = fs.readdirSync(listPath);
+          fileList = files.join('\n');
+        }
+
+        dataContext[`${node.id}_files`] = fileList;
+        this.log('success', `Listed directory: ${listPath} (${fileList.split('\n').length} items)`);
+        break;
+
+      case 'process-start':
+        const processCommand = this.getInputValue(flowData, node.id, 'command', dataContext) || config.command;
+        const processArgs = this.getInputValue(flowData, node.id, 'args', dataContext) || config.args;
+        const processCwd = config.cwd || process.cwd();
+
+        if (!processCommand) {
+          throw new Error('Command is required');
+        }
+
+        // Parse arguments
+        const args = processArgs ? processArgs.split(' ').filter(a => a.trim()) : [];
+
+        // Start process
+        const proc = spawn(processCommand, args, {
+          cwd: processCwd,
+          shell: true,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        // Generate unique process ID
+        const processId = `proc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Store process with output buffer
+        this.processes.set(processId, {
+          process: proc,
+          output: [],
+          startTime: Date.now(),
+          command: processCommand,
+          args: args
+        });
+
+        // Capture output
+        proc.stdout.on('data', (data) => {
+          const procData = this.processes.get(processId);
+          if (procData) {
+            procData.output.push({ type: 'stdout', data: data.toString(), time: Date.now() });
+            // Keep only last 1000 lines
+            if (procData.output.length > 1000) {
+              procData.output = procData.output.slice(-1000);
+            }
+          }
+        });
+
+        proc.stderr.on('data', (data) => {
+          const procData = this.processes.get(processId);
+          if (procData) {
+            procData.output.push({ type: 'stderr', data: data.toString(), time: Date.now() });
+            if (procData.output.length > 1000) {
+              procData.output = procData.output.slice(-1000);
+            }
+          }
+        });
+
+        proc.on('exit', (code) => {
+          const procData = this.processes.get(processId);
+          if (procData) {
+            procData.exitCode = code;
+            procData.exited = true;
+            this.log('info', `Process ${processId} exited with code ${code}`);
+          }
+        });
+
+        dataContext[`${node.id}_processId`] = processId;
+        this.log('success', `Started process: ${processCommand} (ID: ${processId})`);
+        break;
+
+      case 'process-stop':
+        const stopProcessId = this.getInputValue(flowData, node.id, 'processId', dataContext) || config.processId;
+
+        if (!stopProcessId) {
+          throw new Error('Process ID is required');
+        }
+
+        const procToStop = this.processes.get(stopProcessId);
+        if (!procToStop) {
+          throw new Error(`Process not found: ${stopProcessId}`);
+        }
+
+        if (procToStop.exited) {
+          throw new Error(`Process already exited: ${stopProcessId}`);
+        }
+
+        procToStop.process.kill();
+        this.log('success', `Stopped process: ${stopProcessId}`);
+        break;
+
+      case 'process-output':
+        const outputProcessId = this.getInputValue(flowData, node.id, 'processId', dataContext) || config.processId;
+        const outputLines = config.lines || 50;
+
+        if (!outputProcessId) {
+          throw new Error('Process ID is required');
+        }
+
+        const procForOutput = this.processes.get(outputProcessId);
+        if (!procForOutput) {
+          throw new Error(`Process not found: ${outputProcessId}`);
+        }
+
+        // Get last N lines of output
+        const lastLines = procForOutput.output.slice(-outputLines);
+        const outputText = lastLines.map(line => line.data).join('');
+
+        dataContext[`${node.id}_output`] = outputText;
+        this.log('success', `Retrieved ${lastLines.length} lines from process: ${outputProcessId}`);
+        break;
+
+      case 'process-input':
+        const inputProcessId = this.getInputValue(flowData, node.id, 'processId', dataContext) || config.processId;
+        const inputText = this.getInputValue(flowData, node.id, 'input', dataContext) || config.input;
+
+        if (!inputProcessId) {
+          throw new Error('Process ID is required');
+        }
+
+        const procForInput = this.processes.get(inputProcessId);
+        if (!procForInput) {
+          throw new Error(`Process not found: ${inputProcessId}`);
+        }
+
+        if (procForInput.exited) {
+          throw new Error(`Process already exited: ${inputProcessId}`);
+        }
+
+        procForInput.process.stdin.write(inputText + '\n');
+        this.log('success', `Sent input to process ${inputProcessId}: ${inputText}`);
         break;
 
       default:

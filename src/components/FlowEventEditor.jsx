@@ -1046,6 +1046,167 @@ const ACTION_TYPES = [
     ],
     tags: ['variable', 'set', 'save', 'user', 'member', 'storage', 'data', 'store', 'write', 'player', 'money', 'balance'],
   },
+  // System Management Actions
+  {
+    type: 'ssh-execute',
+    label: 'SSH Execute Command',
+    icon: '💻',
+    color: '#2ecc71',
+    defaultData: {
+      host: '',
+      port: 22,
+      username: '',
+      password: '',
+      command: 'ls -la',
+      usePrivateKey: false,
+      privateKey: ''
+    },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'command', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'output', type: 'STRING', label: 'Output' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['ssh', 'remote', 'execute', 'command', 'terminal', 'linux', 'server', 'shell', 'bash'],
+  },
+  {
+    type: 'file-read',
+    label: 'Read File',
+    icon: '📖',
+    color: '#3498db',
+    defaultData: { path: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'content', type: 'STRING', label: 'Content' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'read', 'view', 'load', 'cat', 'text', 'config', 'log'],
+  },
+  {
+    type: 'file-write',
+    label: 'Write File',
+    icon: '✍️',
+    color: '#e74c3c',
+    defaultData: { path: '', content: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+      { id: 'content', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'write', 'save', 'create', 'edit', 'modify', 'text', 'config'],
+  },
+  {
+    type: 'file-delete',
+    label: 'Delete File',
+    icon: '🗑️',
+    color: '#e74c3c',
+    defaultData: { path: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'delete', 'remove', 'rm', 'clean', 'erase'],
+  },
+  {
+    type: 'directory-list',
+    label: 'List Directory',
+    icon: '📂',
+    color: '#f39c12',
+    defaultData: { path: '.', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'files', type: 'STRING', label: 'Files' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['directory', 'list', 'folder', 'ls', 'dir', 'files', 'browse'],
+  },
+  {
+    type: 'process-start',
+    label: 'Start Process',
+    icon: '▶️',
+    color: '#27ae60',
+    defaultData: { command: '', args: '', cwd: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'command', type: 'STRING', optional: true },
+      { id: 'args', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'processId', type: 'STRING', label: 'Process ID' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'start', 'run', 'execute', 'launch', 'program', 'server', 'minecraft', 'mc'],
+  },
+  {
+    type: 'process-stop',
+    label: 'Stop Process',
+    icon: '⏹️',
+    color: '#e74c3c',
+    defaultData: { processId: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'processId', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'stop', 'kill', 'terminate', 'end', 'close', 'shutdown'],
+  },
+  {
+    type: 'process-output',
+    label: 'Get Process Output',
+    icon: '📜',
+    color: '#9b59b6',
+    defaultData: { processId: '', lines: 50 },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'processId', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'output', type: 'STRING', label: 'Output' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'output', 'logs', 'console', 'view', 'read', 'stdout', 'stderr'],
+  },
+  {
+    type: 'process-input',
+    label: 'Send to Process',
+    icon: '⌨️',
+    color: '#3498db',
+    defaultData: { processId: '', input: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'processId', type: 'STRING', optional: true },
+      { id: 'input', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'input', 'stdin', 'send', 'write', 'command', 'console'],
+  },
 ];
 
 function FlowEventEditor({ event, eventType, onSave, onClose }) {
