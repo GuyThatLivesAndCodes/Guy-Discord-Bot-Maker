@@ -294,10 +294,11 @@ class BotRunner {
     const events = this.config.events || [];
     const usedNodeTypes = new Set();
     const usedTriggerTypes = new Set();
+    const blueprintEventNodes = new Set();
 
     // Collect all node types and trigger types used across all events
     events.forEach(event => {
-      // Track event trigger types
+      // Track event trigger types (legacy)
       if (event.type === 'event' && event.triggerType) {
         usedTriggerTypes.add(event.triggerType);
       }
@@ -305,16 +306,54 @@ class BotRunner {
       // Track node types
       if (event.flowData && event.flowData.nodes) {
         event.flowData.nodes.forEach(node => {
+          // Legacy nodes
           if (node.type === 'dataNode' && node.data?.nodeType) {
             usedNodeTypes.add(node.data.nodeType);
           } else if (node.data?.actionType) {
             usedNodeTypes.add(node.data.actionType);
           }
+
+          // Blueprint nodes
+          if (node.type === 'blueprintNode' && node.data?.definitionId) {
+            const defId = node.data.definitionId;
+
+            // Track event nodes (ON_MESSAGE_CREATED, etc.)
+            if (defId.startsWith('ON_') || defId.includes('EVENT')) {
+              blueprintEventNodes.add(defId);
+            }
+
+            // Track action node IDs (action-send-message, etc.)
+            if (defId.startsWith('action-') || defId.startsWith('pure-')) {
+              usedNodeTypes.add(defId);
+            }
+          }
         });
       }
     });
 
-    // Event triggers that need specific intents
+    // Blueprint event nodes that need specific intents
+    if (blueprintEventNodes.has('ON_MESSAGE_CREATED') || blueprintEventNodes.has('ON_MESSAGE_DELETED')) {
+      intents.push(GatewayIntentBits.GuildMessages);
+      intents.push(GatewayIntentBits.MessageContent);
+      this.log('info', 'Blueprint message events detected - loading GuildMessages and MessageContent intents');
+    }
+
+    if (blueprintEventNodes.has('ON_MEMBER_JOINED') || blueprintEventNodes.has('ON_MEMBER_LEFT')) {
+      intents.push(GatewayIntentBits.GuildMembers);
+      this.log('info', 'Blueprint member events detected - loading GuildMembers intent');
+    }
+
+    if (blueprintEventNodes.has('ON_REACTION_ADDED')) {
+      intents.push(GatewayIntentBits.GuildMessageReactions);
+      this.log('info', 'Blueprint reaction events detected - loading GuildMessageReactions intent');
+    }
+
+    if (blueprintEventNodes.has('ON_VOICE_STATE_CHANGED')) {
+      intents.push(GatewayIntentBits.GuildVoiceStates);
+      this.log('info', 'Blueprint voice events detected - loading GuildVoiceStates intent');
+    }
+
+    // Legacy event triggers that need specific intents
     if (usedTriggerTypes.has('messageCreate') || usedTriggerTypes.has('messageDelete')) {
       intents.push(GatewayIntentBits.GuildMessages);
       intents.push(GatewayIntentBits.MessageContent);
@@ -344,7 +383,8 @@ class BotRunner {
     }
 
     // Message-related nodes need GuildMessages and MessageContent
-    const messageNodes = ['send-message', 'delete-message', 'pin-message', 'create-thread', 'react-emoji'];
+    const messageNodes = ['send-message', 'delete-message', 'pin-message', 'create-thread', 'react-emoji',
+                          'action-send-message', 'action-delete-message', 'action-reply-message'];
     if (messageNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
       intents.push(GatewayIntentBits.GuildMessages);
       intents.push(GatewayIntentBits.MessageContent);
