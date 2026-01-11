@@ -3,22 +3,105 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const { app } = require('electron');
+const { spawn } = require('child_process');
+const { Client: SSHClient } = require('ssh2');
 
-// Try to load @discordjs/voice, handle if not installed
+// FFmpeg configuration - runs lazily on first access
+let ffmpegPath = null;
+let ffmpegInitialized = false;
+
+function initializeFFmpeg() {
+  if (ffmpegInitialized) {
+    return; // Already initialized
+  }
+  ffmpegInitialized = true;
+
+  try {
+    // Use ffmpeg-static which includes platform-specific binaries
+    const rawPath = require('ffmpeg-static');
+    if (rawPath) {
+      console.log(`[Voice] ========== FFmpeg Configuration ==========`);
+      console.log(`[Voice] Raw path from ffmpeg-static: ${rawPath}`);
+
+      // Try ASAR unpacked path first
+      const unpackedPath = rawPath.replace('app.asar', 'app.asar.unpacked');
+      const rawPathExists = fs.existsSync(rawPath);
+      const unpackedPathExists = fs.existsSync(unpackedPath);
+
+      console.log(`[Voice] File exists at raw path (in ASAR): ${rawPathExists}`);
+      console.log(`[Voice] File exists at unpacked path: ${unpackedPathExists}`);
+
+      // If neither path works, throw error
+      if (!unpackedPathExists && !rawPathExists) {
+        console.error(`[Voice] ❌ FFmpeg not found at any expected location!`);
+        throw new Error('FFmpeg binary not found');
+      }
+
+      // Determine source path (prefer unpacked, fallback to raw)
+      const sourcePath = unpackedPathExists ? unpackedPath : rawPath;
+
+      // Copy FFmpeg to app data directory for reliable access
+      const userDataPath = app.getPath('userData');
+      const ffmpegDir = path.join(userDataPath, 'ffmpeg');
+      const ffmpegFileName = path.basename(rawPath);
+      const targetPath = path.join(ffmpegDir, ffmpegFileName);
+
+      console.log(`[Voice] App data directory: ${userDataPath}`);
+      console.log(`[Voice] Target FFmpeg path: ${targetPath}`);
+
+      // Create ffmpeg directory if it doesn't exist
+      if (!fs.existsSync(ffmpegDir)) {
+        fs.mkdirSync(ffmpegDir, { recursive: true });
+        console.log(`[Voice] Created FFmpeg directory: ${ffmpegDir}`);
+      }
+
+      // Copy FFmpeg if not already present or if source is newer
+      let needsCopy = !fs.existsSync(targetPath);
+      if (!needsCopy) {
+        // Check if source is newer than target
+        const sourceStats = fs.statSync(sourcePath);
+        const targetStats = fs.statSync(targetPath);
+        needsCopy = sourceStats.mtime > targetStats.mtime;
+      }
+
+      if (needsCopy) {
+        console.log(`[Voice] Copying FFmpeg from ${sourcePath} to ${targetPath}...`);
+        fs.copyFileSync(sourcePath, targetPath);
+        // Set executable permissions on Unix-like systems
+        if (process.platform !== 'win32') {
+          fs.chmodSync(targetPath, 0o755);
+        }
+        console.log(`[Voice] ✅ FFmpeg copied successfully`);
+      } else {
+        console.log(`[Voice] FFmpeg already exists at target path`);
+      }
+
+      // Use the copied version
+      ffmpegPath = targetPath;
+      process.env.FFMPEG_PATH = targetPath;
+
+      console.log(`[Voice] Final FFmpeg path: ${ffmpegPath}`);
+      console.log(`[Voice] File exists at final path: ${fs.existsSync(ffmpegPath)}`);
+      console.log(`[Voice] FFMPEG_PATH env var set to: ${process.env.FFMPEG_PATH}`);
+    } else {
+      console.error('[Voice] ffmpeg-static returned null path!');
+    }
+  } catch (ffmpegError) {
+    console.error('[Voice] Error configuring FFmpeg:', ffmpegError.message);
+    console.error('[Voice] Stack trace:', ffmpegError.stack);
+    console.warn('[Voice] FFmpeg not available. Voice streaming will not work.');
+  }
+}
+
+// Try to load @discordjs/voice module (but don't initialize FFmpeg yet)
 let voiceModule = null;
 try {
   voiceModule = require('@discordjs/voice');
-
-  // Configure FFmpeg path for voice streaming
-  try {
-    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-    process.env.FFMPEG_PATH = ffmpegPath;
-    console.log(`[Voice] FFmpeg configured at: ${ffmpegPath}`);
-  } catch (ffmpegError) {
-    console.warn('[Voice] @ffmpeg-installer/ffmpeg not installed. Voice streaming may not work. Run: npm install @ffmpeg-installer/ffmpeg');
-  }
+  console.log('[Voice] @discordjs/voice module loaded');
 } catch (error) {
-  console.warn('[@discordjs/voice] not installed. Voice features will be disabled. Run: npm install @discordjs/voice');
+  console.error('[Voice] Error loading @discordjs/voice:', error.message);
+  console.warn('[@discordjs/voice] not installed. Voice features will be disabled.');
 }
 
 class BotRunner {
@@ -30,6 +113,11 @@ class BotRunner {
     this.isRunning = false;
     this.voiceConnections = new Map(); // Store voice connections per guild
     this.audioPlayers = new Map(); // Store audio players per guild
+    this.processes = new Map(); // Store running processes by ID
+    this.sshConnections = new Map(); // Store SSH connections by config hash
+
+    // Anti-hack tracking
+    this.userActivity = new Map(); // Track user activity for anti-hack detection
 
     // Initialize storage directories
     this.storagePath = path.join(process.cwd(), 'bot-storage', this.botId);
@@ -93,6 +181,34 @@ class BotRunner {
       this.log('error', `Failed to get variable: ${error.message}`);
       return '';
     }
+  }
+
+  // SSH operations
+  async executeSSHCommand(sshConfig, command) {
+    return new Promise((resolve, reject) => {
+      const conn = new SSHClient();
+      let output = '';
+
+      conn.on('ready', () => {
+        conn.exec(command, (err, stream) => {
+          if (err) {
+            conn.end();
+            return reject(err);
+          }
+
+          stream.on('close', (code, signal) => {
+            conn.end();
+            resolve(output);
+          }).on('data', (data) => {
+            output += data.toString();
+          }).stderr.on('data', (data) => {
+            output += data.toString();
+          });
+        });
+      }).on('error', (err) => {
+        reject(err);
+      }).connect(sshConfig);
+    });
   }
 
   // File operations
@@ -258,6 +374,9 @@ class BotRunner {
 
     this.log('info', 'Starting bot...');
 
+    // Initialize FFmpeg on first bot start (lazy initialization)
+    initializeFFmpeg();
+
     // Determine required intents based on nodes used
     const requiredIntents = this.determineRequiredIntents();
     this.log('info', `Loading ${requiredIntents.length} intents based on nodes used`);
@@ -392,6 +511,12 @@ class BotRunner {
       this.registerEventTrigger(eventTrigger);
     });
 
+    // Register Anti-Hack triggers
+    const antiHackTriggers = (this.config.events || []).filter(event => event.type === 'anti-hack');
+    if (antiHackTriggers.length > 0) {
+      this.registerAntiHackTriggers(antiHackTriggers);
+    }
+
     this.client.on('error', (error) => {
       this.log('error', `Client error: ${error.message}`);
     });
@@ -477,6 +602,222 @@ class BotRunner {
     }
   }
 
+  registerAntiHackTriggers(antiHackTriggers) {
+    const TIME_WINDOW = 10000; // 10 seconds for rate limiting
+    const MAX_MESSAGES = 5; // Max messages in time window
+    const MAX_EDITS = 3; // Max edits in time window
+    const MAX_DELETES = 3; // Max deletes in time window
+    const MAX_LINKS = 3; // Max links in single message or time window
+    const MAX_ATTACHMENTS = 3; // Max attachments in time window
+    const MAX_MENTIONS = 5; // Max mentions in single message
+    const MAX_EMOJIS = 10; // Max emojis in single message
+
+    // Message create handler for spam detection
+    this.client.on('messageCreate', async (message) => {
+      if (message.author.bot) return;
+
+      const userId = message.author.id;
+      const now = Date.now();
+
+      // Initialize user activity tracking
+      if (!this.userActivity.has(userId)) {
+        this.userActivity.set(userId, {
+          messages: [],
+          edits: [],
+          deletes: [],
+          attachments: [],
+          lastMessages: [], // For duplicate detection
+        });
+      }
+
+      const activity = this.userActivity.get(userId);
+
+      // Clean old activity (older than TIME_WINDOW)
+      activity.messages = activity.messages.filter(t => now - t < TIME_WINDOW);
+      activity.edits = activity.edits.filter(t => now - t < TIME_WINDOW);
+      activity.deletes = activity.deletes.filter(t => now - t < TIME_WINDOW);
+      activity.attachments = activity.attachments.filter(t => now - t < TIME_WINDOW);
+
+      // Track message
+      activity.messages.push(now);
+
+      // Message Spam Detection
+      if (activity.messages.length > MAX_MESSAGES) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'messageSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Message spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'messageSpam',
+            user: message.author,
+            channel: message.channel,
+            guild: message.guild,
+            messageCount: activity.messages.length
+          });
+        }
+      }
+
+      // Link Spam Detection
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const links = message.content.match(urlRegex) || [];
+      if (links.length > MAX_LINKS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'linkSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Link spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'linkSpam',
+            user: message.author,
+            channel: message.channel,
+            linkCount: links.length
+          });
+        }
+      }
+
+      // Attachment Spam Detection
+      if (message.attachments.size > 0) {
+        activity.attachments.push(now);
+        if (activity.attachments.length > MAX_ATTACHMENTS) {
+          const trigger = antiHackTriggers.find(t => t.triggerType === 'attachmentSpam');
+          if (trigger) {
+            this.log('warning', `[Anti-Hack] Attachment spam detected from ${message.author.tag}`);
+            await this.executeEventFlow(trigger, {
+              type: 'attachmentSpam',
+              user: message.author,
+              channel: message.channel,
+              attachmentCount: activity.attachments.length
+            });
+          }
+        }
+      }
+
+      // Mention Spam Detection
+      const mentions = message.mentions.users.size + message.mentions.roles.size;
+      if (mentions > MAX_MENTIONS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'mentionSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Mention spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'mentionSpam',
+            user: message.author,
+            channel: message.channel,
+            mentionCount: mentions
+          });
+        }
+      }
+
+      // Emoji Spam Detection
+      const emojiRegex = /<a?:[a-zA-Z0-9_]+:[0-9]+>|[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu;
+      const emojis = message.content.match(emojiRegex) || [];
+      if (emojis.length > MAX_EMOJIS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'emojiSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Emoji spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'emojiSpam',
+            user: message.author,
+            channel: message.channel,
+            emojiCount: emojis.length
+          });
+        }
+      }
+
+      // Duplicate Messages Detection
+      const messageContent = message.content.toLowerCase().trim();
+      if (messageContent.length > 0) {
+        activity.lastMessages = activity.lastMessages || [];
+        activity.lastMessages.push({ content: messageContent, time: now });
+        activity.lastMessages = activity.lastMessages.filter(m => now - m.time < TIME_WINDOW);
+
+        const duplicates = activity.lastMessages.filter(m => m.content === messageContent).length;
+        if (duplicates >= 3) { // Same message 3+ times
+          const trigger = antiHackTriggers.find(t => t.triggerType === 'duplicateMessages');
+          if (trigger) {
+            this.log('warning', `[Anti-Hack] Duplicate messages detected from ${message.author.tag}`);
+            await this.executeEventFlow(trigger, {
+              type: 'duplicateMessages',
+              user: message.author,
+              channel: message.channel,
+              duplicateCount: duplicates
+            });
+          }
+        }
+      }
+    });
+
+    // Message update handler for suspicious edit detection
+    this.client.on('messageUpdate', async (oldMessage, newMessage) => {
+      if (newMessage.author?.bot) return;
+
+      const userId = newMessage.author.id;
+      const now = Date.now();
+
+      if (!this.userActivity.has(userId)) {
+        this.userActivity.set(userId, {
+          messages: [],
+          edits: [],
+          deletes: [],
+          attachments: [],
+          lastMessages: [],
+        });
+      }
+
+      const activity = this.userActivity.get(userId);
+      activity.edits = activity.edits.filter(t => now - t < TIME_WINDOW);
+      activity.edits.push(now);
+
+      // Suspicious Edit Detection
+      if (activity.edits.length > MAX_EDITS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'suspiciousEdit');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Suspicious edits detected from ${newMessage.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'suspiciousEdit',
+            user: newMessage.author,
+            channel: newMessage.channel,
+            editCount: activity.edits.length
+          });
+        }
+      }
+    });
+
+    // Message delete handler for mass delete detection
+    this.client.on('messageDelete', async (message) => {
+      if (message.author?.bot) return;
+
+      const userId = message.author.id;
+      const now = Date.now();
+
+      if (!this.userActivity.has(userId)) {
+        this.userActivity.set(userId, {
+          messages: [],
+          edits: [],
+          deletes: [],
+          attachments: [],
+          lastMessages: [],
+        });
+      }
+
+      const activity = this.userActivity.get(userId);
+      activity.deletes = activity.deletes.filter(t => now - t < TIME_WINDOW);
+      activity.deletes.push(now);
+
+      // Mass Delete Detection
+      if (activity.deletes.length > MAX_DELETES) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'massDelete');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Mass delete detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'massDelete',
+            user: message.author,
+            channel: message.channel,
+            deleteCount: activity.deletes.length
+          });
+        }
+      }
+    });
+
+    this.log('info', `Registered ${antiHackTriggers.length} anti-hack triggers`);
+  }
+
   async executeEventFlow(eventTrigger, eventData) {
     const flowData = eventTrigger.flowData;
 
@@ -518,6 +859,56 @@ class BotRunner {
         dataContext.user = eventData.newState.member?.user;
         dataContext.guild = eventData.newState.guild;
         break;
+
+      // Anti-Hack triggers
+      case 'messageSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.guild = eventData.guild;
+        dataContext.messageCount = eventData.messageCount;
+        break;
+
+      case 'suspiciousEdit':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.editCount = eventData.editCount;
+        break;
+
+      case 'massDelete':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.deleteCount = eventData.deleteCount;
+        break;
+
+      case 'linkSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.linkCount = eventData.linkCount;
+        break;
+
+      case 'attachmentSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.attachmentCount = eventData.attachmentCount;
+        break;
+
+      case 'mentionSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.mentionCount = eventData.mentionCount;
+        break;
+
+      case 'emojiSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.emojiCount = eventData.emojiCount;
+        break;
+
+      case 'duplicateMessages':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.duplicateCount = eventData.duplicateCount;
+        break;
     }
 
     // Find trigger node
@@ -545,6 +936,7 @@ class BotRunner {
 
       // Initialize data context with trigger data
       const dataContext = {
+        interaction: interaction,
         user: interaction.user,
         channel: interaction.channel,
         guild: interaction.guild,
@@ -801,7 +1193,6 @@ class BotRunner {
 
         const messageOptions = {
           content: messageContent,
-          ephemeral: interaction ? (config.ephemeral || false) : undefined
         };
 
         // Check for connected file attachment
@@ -819,22 +1210,34 @@ class BotRunner {
           }
         }
 
-        // For commands: use interaction.reply
-        // For event triggers: use channel.send
-        if (interaction) {
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply(messageOptions);
+        // Check for connected INTERACTION input (for replying to specific interaction)
+        const connectedInteraction = this.getInputValue(flowData, node.id, 'interaction', dataContext);
+        const useInteraction = connectedInteraction || interaction;
+
+        // Add ephemeral flag if using interaction
+        if (useInteraction) {
+          messageOptions.ephemeral = config.ephemeral || false;
+        }
+
+        let sentMessage;
+        // If we have an interaction, use it to reply
+        if (useInteraction) {
+          if (!useInteraction.replied && !useInteraction.deferred) {
+            sentMessage = await useInteraction.reply({ ...messageOptions, fetchReply: true });
           } else {
-            await interaction.followUp(messageOptions);
+            sentMessage = await useInteraction.followUp({ ...messageOptions, fetchReply: true });
           }
         } else {
-          // Event trigger - send to channel from context
+          // No interaction - send to channel from context
           const channel = dataContext.channel;
           if (!channel) {
             throw new Error('No channel available for sending message');
           }
-          await channel.send(messageOptions);
+          sentMessage = await channel.send(messageOptions);
         }
+
+        // Store the sent message in dataContext for MESSAGE output
+        dataContext[`${node.id}_message`] = sentMessage;
         break;
 
       case 'embed':
@@ -876,14 +1279,36 @@ class BotRunner {
 
         const embedOptions = {
           embeds: [embed],
-          ephemeral: config.ephemeral || false
         };
 
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply(embedOptions);
-        } else {
-          await interaction.followUp(embedOptions);
+        // Check for connected INTERACTION input (for replying to specific interaction)
+        const connectedEmbedInteraction = this.getInputValue(flowData, node.id, 'interaction', dataContext);
+        const useEmbedInteraction = connectedEmbedInteraction || interaction;
+
+        // Add ephemeral flag if using interaction
+        if (useEmbedInteraction) {
+          embedOptions.ephemeral = config.ephemeral || false;
         }
+
+        let sentEmbedMessage;
+        // If we have an interaction, use it to reply
+        if (useEmbedInteraction) {
+          if (!useEmbedInteraction.replied && !useEmbedInteraction.deferred) {
+            sentEmbedMessage = await useEmbedInteraction.reply({ ...embedOptions, fetchReply: true });
+          } else {
+            sentEmbedMessage = await useEmbedInteraction.followUp({ ...embedOptions, fetchReply: true });
+          }
+        } else {
+          // No interaction - send to channel from context
+          const embedChannel = dataContext.channel;
+          if (!embedChannel) {
+            throw new Error('No channel available for sending embed');
+          }
+          sentEmbedMessage = await embedChannel.send(embedOptions);
+        }
+
+        // Store the sent message in dataContext for MESSAGE output
+        dataContext[`${node.id}_message`] = sentEmbedMessage;
         break;
 
       case 'add-role':
@@ -930,6 +1355,15 @@ class BotRunner {
       case 'branch':
         // Branch node handles conditional flow - handled in executeFlow
         // The branch logic is handled by checking outputs in executeFlow
+        break;
+
+      case 'wait':
+        // Wait/delay action
+        const delaySeconds = this.getInputValue(flowData, node.id, 'seconds', dataContext) || config.seconds || 1;
+        const delayMs = delaySeconds * 1000;
+        this.log('info', `Waiting for ${delaySeconds} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        this.log('success', `Wait completed`);
         break;
 
       case 'timeout-member':
@@ -1040,12 +1474,20 @@ class BotRunner {
         break;
 
       case 'delete-message':
-        if (!interaction.message) {
-          throw new Error('No message to delete');
-        }
+        // Check for connected MESSAGE input
+        const messageToDelete = this.getInputValue(flowData, node.id, 'message', dataContext);
 
-        await interaction.message.delete();
-        this.log('success', 'Deleted message');
+        if (messageToDelete) {
+          // Delete the connected message
+          await messageToDelete.delete();
+          this.log('success', 'Deleted message from MESSAGE input');
+        } else if (interaction && interaction.message) {
+          // Fallback: delete interaction message (for message component interactions)
+          await interaction.message.delete();
+          this.log('success', 'Deleted interaction message');
+        } else {
+          throw new Error('No message to delete - connect a MESSAGE input or use on a message component');
+        }
         break;
 
       case 'pin-message':
@@ -1178,6 +1620,14 @@ class BotRunner {
             throw new Error('No file specified. Connect a file or filename.');
           }
 
+          // Verify FFmpeg is available
+          if (!ffmpegPath) {
+            throw new Error('FFmpeg not found. ffmpeg-static may not be installed. Please reinstall: npm install ffmpeg-static');
+          }
+
+          this.log('info', `Using FFmpeg at: ${ffmpegPath}`);
+          this.log('info', `FFMPEG_PATH env var: ${process.env.FFMPEG_PATH}`);
+
           // Stop any currently playing audio
           let player = this.audioPlayers.get(interaction.guild.id);
           if (player) {
@@ -1188,7 +1638,13 @@ class BotRunner {
           }
 
           // Create audio resource from file
-          const resource = createAudioResource(filePath);
+          // FFmpeg path is already set in process.env.FFMPEG_PATH
+          const resource = createAudioResource(filePath, {
+            inlineVolume: true,
+            metadata: {
+              title: path.basename(filePath)
+            }
+          });
 
           // Subscribe connection to player
           voiceConnection.subscribe(player);
@@ -1314,6 +1770,230 @@ class BotRunner {
           throw new Error('Failed to set user variable');
         }
         this.log('success', `Set user variable: ${userKey} = ${userValue} (User: ${userForVar.tag || userForVar.id})`);
+        break;
+
+      // System Management Actions
+      case 'ssh-execute':
+        const sshCommand = this.getInputValue(flowData, node.id, 'command', dataContext) || config.command;
+        const sshConfig = {
+          host: config.host,
+          port: config.port || 22,
+          username: config.username,
+          password: config.password,
+          privateKey: config.usePrivateKey ? fs.readFileSync(config.privateKey) : undefined
+        };
+
+        if (!sshConfig.host || !sshConfig.username) {
+          throw new Error('SSH host and username are required');
+        }
+
+        const sshOutput = await this.executeSSHCommand(sshConfig, sshCommand);
+        dataContext[`${node.id}_output`] = sshOutput;
+        this.log('success', `SSH command executed: ${sshCommand.substring(0, 50)}...`);
+        break;
+
+      case 'file-read':
+        const readPath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path;
+        if (!readPath) {
+          throw new Error('File path is required');
+        }
+
+        let readContent;
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          readContent = fs.readFileSync(readPath, 'utf8');
+        }
+
+        dataContext[`${node.id}_content`] = readContent;
+        this.log('success', `Read file: ${readPath}`);
+        break;
+
+      case 'file-write':
+        const writePath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path;
+        const writeContent = this.getInputValue(flowData, node.id, 'content', dataContext) || config.content;
+
+        if (!writePath) {
+          throw new Error('File path is required');
+        }
+
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          // Ensure directory exists
+          const writeDir = path.dirname(writePath);
+          if (!fs.existsSync(writeDir)) {
+            fs.mkdirSync(writeDir, { recursive: true });
+          }
+          fs.writeFileSync(writePath, writeContent || '', 'utf8');
+        }
+
+        this.log('success', `Wrote file: ${writePath}`);
+        break;
+
+      case 'file-delete':
+        const deletePath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path;
+        if (!deletePath) {
+          throw new Error('File path is required');
+        }
+
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          if (fs.existsSync(deletePath)) {
+            fs.unlinkSync(deletePath);
+          } else {
+            throw new Error(`File not found: ${deletePath}`);
+          }
+        }
+
+        this.log('success', `Deleted file: ${deletePath}`);
+        break;
+
+      case 'directory-list':
+        const listPath = this.getInputValue(flowData, node.id, 'path', dataContext) || config.path || '.';
+
+        let fileList;
+        if (config.ssh) {
+          throw new Error('SSH file operations require SSH Execute node first (not yet implemented)');
+        } else {
+          if (!fs.existsSync(listPath)) {
+            throw new Error(`Directory not found: ${listPath}`);
+          }
+          const files = fs.readdirSync(listPath);
+          fileList = files.join('\n');
+        }
+
+        dataContext[`${node.id}_files`] = fileList;
+        this.log('success', `Listed directory: ${listPath} (${fileList.split('\n').length} items)`);
+        break;
+
+      case 'process-start':
+        const processCommand = this.getInputValue(flowData, node.id, 'command', dataContext) || config.command;
+        const processArgs = this.getInputValue(flowData, node.id, 'args', dataContext) || config.args;
+        const processCwd = config.cwd || process.cwd();
+
+        if (!processCommand) {
+          throw new Error('Command is required');
+        }
+
+        // Parse arguments
+        const args = processArgs ? processArgs.split(' ').filter(a => a.trim()) : [];
+
+        // Start process
+        const proc = spawn(processCommand, args, {
+          cwd: processCwd,
+          shell: true,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        // Generate unique process ID
+        const processId = `proc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Store process with output buffer
+        this.processes.set(processId, {
+          process: proc,
+          output: [],
+          startTime: Date.now(),
+          command: processCommand,
+          args: args
+        });
+
+        // Capture output
+        proc.stdout.on('data', (data) => {
+          const procData = this.processes.get(processId);
+          if (procData) {
+            procData.output.push({ type: 'stdout', data: data.toString(), time: Date.now() });
+            // Keep only last 1000 lines
+            if (procData.output.length > 1000) {
+              procData.output = procData.output.slice(-1000);
+            }
+          }
+        });
+
+        proc.stderr.on('data', (data) => {
+          const procData = this.processes.get(processId);
+          if (procData) {
+            procData.output.push({ type: 'stderr', data: data.toString(), time: Date.now() });
+            if (procData.output.length > 1000) {
+              procData.output = procData.output.slice(-1000);
+            }
+          }
+        });
+
+        proc.on('exit', (code) => {
+          const procData = this.processes.get(processId);
+          if (procData) {
+            procData.exitCode = code;
+            procData.exited = true;
+            this.log('info', `Process ${processId} exited with code ${code}`);
+          }
+        });
+
+        dataContext[`${node.id}_processId`] = processId;
+        this.log('success', `Started process: ${processCommand} (ID: ${processId})`);
+        break;
+
+      case 'process-stop':
+        const stopProcessId = this.getInputValue(flowData, node.id, 'processId', dataContext) || config.processId;
+
+        if (!stopProcessId) {
+          throw new Error('Process ID is required');
+        }
+
+        const procToStop = this.processes.get(stopProcessId);
+        if (!procToStop) {
+          throw new Error(`Process not found: ${stopProcessId}`);
+        }
+
+        if (procToStop.exited) {
+          throw new Error(`Process already exited: ${stopProcessId}`);
+        }
+
+        procToStop.process.kill();
+        this.log('success', `Stopped process: ${stopProcessId}`);
+        break;
+
+      case 'process-output':
+        const outputProcessId = this.getInputValue(flowData, node.id, 'processId', dataContext) || config.processId;
+        const outputLines = config.lines || 50;
+
+        if (!outputProcessId) {
+          throw new Error('Process ID is required');
+        }
+
+        const procForOutput = this.processes.get(outputProcessId);
+        if (!procForOutput) {
+          throw new Error(`Process not found: ${outputProcessId}`);
+        }
+
+        // Get last N lines of output
+        const lastLines = procForOutput.output.slice(-outputLines);
+        const outputText = lastLines.map(line => line.data).join('');
+
+        dataContext[`${node.id}_output`] = outputText;
+        this.log('success', `Retrieved ${lastLines.length} lines from process: ${outputProcessId}`);
+        break;
+
+      case 'process-input':
+        const inputProcessId = this.getInputValue(flowData, node.id, 'processId', dataContext) || config.processId;
+        const inputText = this.getInputValue(flowData, node.id, 'input', dataContext) || config.input;
+
+        if (!inputProcessId) {
+          throw new Error('Process ID is required');
+        }
+
+        const procForInput = this.processes.get(inputProcessId);
+        if (!procForInput) {
+          throw new Error(`Process not found: ${inputProcessId}`);
+        }
+
+        if (procForInput.exited) {
+          throw new Error(`Process already exited: ${inputProcessId}`);
+        }
+
+        procForInput.process.stdin.write(inputText + '\n');
+        this.log('success', `Sent input to process ${inputProcessId}: ${inputText}`);
         break;
 
       default:

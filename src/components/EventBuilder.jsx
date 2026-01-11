@@ -18,6 +18,13 @@ const EVENT_TYPES = [
     description: 'Triggered by Discord events (message, member join, reactions, etc.)',
     available: true,
   },
+  {
+    type: 'anti-hack',
+    label: 'Anti-Hack',
+    icon: '🛡️',
+    description: 'Detect and prevent hacked clients, spam, and suspicious behavior',
+    available: true,
+  },
 ];
 
 function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
@@ -141,6 +148,7 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
                 <div className="event-card-body">
                   {event.type === 'command' && <div className="event-name">/{event.name}</div>}
                   {event.type === 'event' && <div className="event-name">{event.triggerType || 'Event'}</div>}
+                  {event.type === 'anti-hack' && <div className="event-name">🛡️ {event.triggerType || 'Anti-Hack'}</div>}
                   <p className="event-description">{event.description || 'No description'}</p>
                   <div className="event-stats">
                     <span className="stat">

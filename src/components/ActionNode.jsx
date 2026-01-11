@@ -489,6 +489,25 @@ const ActionNode = ({ id, data }) => {
             </div>
           )}
 
+          {data.actionType === 'wait' && (
+            <div className="config-field">
+              <label>Delay (seconds)</label>
+              <input
+                type="number"
+                value={data.config.seconds || 1}
+                onChange={(e) => handleConfigChange('seconds', parseFloat(e.target.value) || 1)}
+                placeholder="1"
+                min="0"
+                step="0.1"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                ⏱️ Wait this many seconds before continuing (can use decimals like 0.5)
+              </small>
+            </div>
+          )}
+
           {data.actionType === 'save-file-to-server' && (
             <>
               <div className="config-field">
@@ -552,6 +571,394 @@ const ActionNode = ({ id, data }) => {
                 />
                 <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
                   💡 Connect STRING inputs to set key and value dynamically
+                </small>
+              </div>
+            </>
+          )}
+
+          {/* System Management Nodes */}
+          {data.actionType === 'ssh-execute' && (
+            <>
+              <div className="config-field">
+                <label>SSH Host</label>
+                <input
+                  type="text"
+                  value={data.config.host || ''}
+                  onChange={(e) => handleConfigChange('host', e.target.value)}
+                  placeholder="192.168.1.100"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Port</label>
+                <input
+                  type="number"
+                  value={data.config.port || 22}
+                  onChange={(e) => handleConfigChange('port', parseInt(e.target.value) || 22)}
+                  placeholder="22"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Username</label>
+                <input
+                  type="text"
+                  value={data.config.username || ''}
+                  onChange={(e) => handleConfigChange('username', e.target.value)}
+                  placeholder="root"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfigChange('usePrivateKey', !data.config.usePrivateKey);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={data.config.usePrivateKey || false}
+                    onChange={() => {}}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label style={{ cursor: 'pointer', margin: 0 }}>Use Private Key</label>
+                </div>
+              </div>
+              {!data.config.usePrivateKey && (
+                <div className="config-field">
+                  <label>Password</label>
+                  <input
+                    type="password"
+                    value={data.config.password || ''}
+                    onChange={(e) => handleConfigChange('password', e.target.value)}
+                    placeholder="password"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              )}
+              {data.config.usePrivateKey && (
+                <div className="config-field">
+                  <label>Private Key Path</label>
+                  <input
+                    type="text"
+                    value={data.config.privateKey || ''}
+                    onChange={(e) => handleConfigChange('privateKey', e.target.value)}
+                    placeholder="/home/user/.ssh/id_rsa"
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+              )}
+              <div className="config-field">
+                <label>Command</label>
+                <textarea
+                  value={data.config.command || ''}
+                  onChange={(e) => handleConfigChange('command', e.target.value)}
+                  placeholder="ls -la"
+                  rows={3}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Connect a STRING input to set command dynamically
+                </small>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'file-read' && (
+            <>
+              <div className="config-field">
+                <label>File Path</label>
+                <input
+                  type="text"
+                  value={data.config.path || ''}
+                  onChange={(e) => handleConfigChange('path', e.target.value)}
+                  placeholder="/path/to/file.txt"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Use absolute paths for reliability
+                </small>
+              </div>
+              <div className="config-field">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfigChange('ssh', !data.config.ssh);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={data.config.ssh || false}
+                    onChange={() => {}}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label style={{ cursor: 'pointer', margin: 0 }}>Use SSH (requires SSH Execute)</label>
+                </div>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'file-write' && (
+            <>
+              <div className="config-field">
+                <label>File Path</label>
+                <input
+                  type="text"
+                  value={data.config.path || ''}
+                  onChange={(e) => handleConfigChange('path', e.target.value)}
+                  placeholder="/path/to/file.txt"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Content</label>
+                <textarea
+                  value={data.config.content || ''}
+                  onChange={(e) => handleConfigChange('content', e.target.value)}
+                  placeholder="File content here..."
+                  rows={5}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  💡 Connect a STRING input to set content dynamically
+                </small>
+              </div>
+              <div className="config-field">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfigChange('ssh', !data.config.ssh);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={data.config.ssh || false}
+                    onChange={() => {}}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label style={{ cursor: 'pointer', margin: 0 }}>Use SSH (requires SSH Execute)</label>
+                </div>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'file-delete' && (
+            <>
+              <div className="config-field">
+                <label>File Path</label>
+                <input
+                  type="text"
+                  value={data.config.path || ''}
+                  onChange={(e) => handleConfigChange('path', e.target.value)}
+                  placeholder="/path/to/file.txt"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  ⚠️ This will permanently delete the file!
+                </small>
+              </div>
+              <div className="config-field">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfigChange('ssh', !data.config.ssh);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={data.config.ssh || false}
+                    onChange={() => {}}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label style={{ cursor: 'pointer', margin: 0 }}>Use SSH (requires SSH Execute)</label>
+                </div>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'directory-list' && (
+            <>
+              <div className="config-field">
+                <label>Directory Path</label>
+                <input
+                  type="text"
+                  value={data.config.path || ''}
+                  onChange={(e) => handleConfigChange('path', e.target.value)}
+                  placeholder="/path/to/directory"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  📂 Outputs a list of files and directories
+                </small>
+              </div>
+              <div className="config-field">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfigChange('ssh', !data.config.ssh);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={data.config.ssh || false}
+                    onChange={() => {}}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label style={{ cursor: 'pointer', margin: 0 }}>Use SSH (requires SSH Execute)</label>
+                </div>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'process-start' && (
+            <>
+              <div className="config-field">
+                <label>Command</label>
+                <input
+                  type="text"
+                  value={data.config.command || ''}
+                  onChange={(e) => handleConfigChange('command', e.target.value)}
+                  placeholder="java -jar server.jar"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Arguments (space-separated)</label>
+                <input
+                  type="text"
+                  value={data.config.args || ''}
+                  onChange={(e) => handleConfigChange('args', e.target.value)}
+                  placeholder="--nogui"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Working Directory</label>
+                <input
+                  type="text"
+                  value={data.config.cwd || ''}
+                  onChange={(e) => handleConfigChange('cwd', e.target.value)}
+                  placeholder="/home/minecraft"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  ▶️ Returns a Process ID you can use to control it
+                </small>
+              </div>
+              <div className="config-field">
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleConfigChange('ssh', !data.config.ssh);
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={data.config.ssh || false}
+                    onChange={() => {}}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <label style={{ cursor: 'pointer', margin: 0 }}>Use SSH (requires SSH Execute)</label>
+                </div>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'process-stop' && (
+            <>
+              <div className="config-field">
+                <label>Process ID</label>
+                <input
+                  type="text"
+                  value={data.config.processId || ''}
+                  onChange={(e) => handleConfigChange('processId', e.target.value)}
+                  placeholder="Connect from Start Process output"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  ⏹️ Connect the processId output from Start Process
+                </small>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'process-output' && (
+            <>
+              <div className="config-field">
+                <label>Process ID</label>
+                <input
+                  type="text"
+                  value={data.config.processId || ''}
+                  onChange={(e) => handleConfigChange('processId', e.target.value)}
+                  placeholder="Connect from Start Process output"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Number of Lines (tail)</label>
+                <input
+                  type="number"
+                  value={data.config.lines || 50}
+                  onChange={(e) => handleConfigChange('lines', parseInt(e.target.value) || 50)}
+                  placeholder="50"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  📜 Gets the last N lines of console output
+                </small>
+              </div>
+            </>
+          )}
+
+          {data.actionType === 'process-input' && (
+            <>
+              <div className="config-field">
+                <label>Process ID</label>
+                <input
+                  type="text"
+                  value={data.config.processId || ''}
+                  onChange={(e) => handleConfigChange('processId', e.target.value)}
+                  placeholder="Connect from Start Process output"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="config-field">
+                <label>Input to Send</label>
+                <input
+                  type="text"
+                  value={data.config.input || ''}
+                  onChange={(e) => handleConfigChange('input', e.target.value)}
+                  placeholder="stop"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <small style={{ color: '#b5bac1', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                  ⌨️ Sends input to the process (like typing in console)
                 </small>
               </div>
             </>

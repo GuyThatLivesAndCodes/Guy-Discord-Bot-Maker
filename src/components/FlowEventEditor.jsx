@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import ReactFlow, {
   MiniMap,
   Controls,
@@ -97,6 +97,104 @@ const TRIGGER_TYPES = {
       { id: 'flow', type: 'FLOW', label: 'Flow' },
       { id: 'user', type: 'USER', label: 'User' },
       { id: 'guild', type: 'GUILD', label: 'Guild' },
+    ],
+  },
+  // Anti-Hack triggers
+  messageSpam: {
+    type: 'antihack-message-spam',
+    label: 'Message Spam Detected',
+    icon: '⚡',
+    color: '#ed4245',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'Spammer' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+      { id: 'messageCount', type: 'NUMBER', label: 'Message Count' },
+    ],
+  },
+  suspiciousEdit: {
+    type: 'antihack-suspicious-edit',
+    label: 'Suspicious Edit Detected',
+    icon: '✏️',
+    color: '#f39c12',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'editCount', type: 'NUMBER', label: 'Edit Count' },
+    ],
+  },
+  massDelete: {
+    type: 'antihack-mass-delete',
+    label: 'Mass Delete Detected',
+    icon: '🗑️',
+    color: '#e74c3c',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'deleteCount', type: 'NUMBER', label: 'Delete Count' },
+    ],
+  },
+  linkSpam: {
+    type: 'antihack-link-spam',
+    label: 'Link Spam Detected',
+    icon: '🔗',
+    color: '#3498db',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'linkCount', type: 'NUMBER', label: 'Link Count' },
+    ],
+  },
+  attachmentSpam: {
+    type: 'antihack-attachment-spam',
+    label: 'Attachment Spam Detected',
+    icon: '📎',
+    color: '#9b59b6',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'attachmentCount', type: 'NUMBER', label: 'Attachment Count' },
+    ],
+  },
+  mentionSpam: {
+    type: 'antihack-mention-spam',
+    label: 'Mention Spam Detected',
+    icon: '@',
+    color: '#e67e22',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'mentionCount', type: 'NUMBER', label: 'Mention Count' },
+    ],
+  },
+  emojiSpam: {
+    type: 'antihack-emoji-spam',
+    label: 'Emoji Spam Detected',
+    icon: '😂',
+    color: '#faa61a',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'emojiCount', type: 'NUMBER', label: 'Emoji Count' },
+    ],
+  },
+  duplicateMessages: {
+    type: 'antihack-duplicate-messages',
+    label: 'Duplicate Messages Detected',
+    icon: '📋',
+    color: '#95a5a6',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'duplicateCount', type: 'NUMBER', label: 'Duplicate Count' },
     ],
   },
 };
@@ -598,11 +696,13 @@ const ACTION_TYPES = [
     defaultData: { content: 'Hello, World!', ephemeral: false },
     inputs: [
       { id: 'flow', type: 'FLOW' },
+      { id: 'interaction', type: 'INTERACTION', optional: true },
       { id: 'content', type: 'STRING', optional: true },
       { id: 'file', type: 'ATTACHMENT', optional: true },
     ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'message', type: 'MESSAGE', label: 'Sent Message' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['message', 'send', 'reply', 'respond', 'chat', 'talk', 'image', 'attachment'],
@@ -630,6 +730,7 @@ const ACTION_TYPES = [
     },
     inputs: [
       { id: 'flow', type: 'FLOW' },
+      { id: 'interaction', type: 'INTERACTION', optional: true },
       { id: 'title', type: 'STRING', optional: true },
       { id: 'description', type: 'STRING', optional: true },
       { id: 'author', type: 'STRING', optional: true },
@@ -638,6 +739,7 @@ const ACTION_TYPES = [
     ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'message', type: 'MESSAGE', label: 'Sent Message' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
     ],
     tags: ['embed', 'message', 'rich', 'fancy', 'formatted', 'card'],
@@ -883,7 +985,10 @@ const ACTION_TYPES = [
     icon: '🗑️',
     color: '#ed4245',
     defaultData: {},
-    inputs: [{ id: 'flow', type: 'FLOW' }],
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'message', type: 'MESSAGE', optional: true },
+    ],
     outputs: [
       { id: 'flow', type: 'FLOW', label: 'Success' },
       { id: 'fail', type: 'FLOW', label: 'Fail' },
@@ -934,6 +1039,21 @@ const ACTION_TYPES = [
       { id: 'false', type: 'FLOW', label: 'False' },
     ],
     tags: ['branch', 'if', 'condition', 'check', 'conditional', 'split', 'decision'],
+  },
+  {
+    type: 'wait',
+    label: 'Wait / Delay',
+    icon: '⏱️',
+    color: '#9b59b6',
+    defaultData: { seconds: 1 },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'seconds', type: 'NUMBER', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'After Delay' },
+    ],
+    tags: ['wait', 'delay', 'sleep', 'pause', 'timeout', 'timer', 'time'],
   },
   // File operation actions
   {
@@ -1024,6 +1144,167 @@ const ACTION_TYPES = [
     ],
     tags: ['variable', 'set', 'save', 'user', 'member', 'storage', 'data', 'store', 'write', 'player', 'money', 'balance'],
   },
+  // System Management Actions
+  {
+    type: 'ssh-execute',
+    label: 'SSH Execute Command',
+    icon: '💻',
+    color: '#2ecc71',
+    defaultData: {
+      host: '',
+      port: 22,
+      username: '',
+      password: '',
+      command: 'ls -la',
+      usePrivateKey: false,
+      privateKey: ''
+    },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'command', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'output', type: 'STRING', label: 'Output' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['ssh', 'remote', 'execute', 'command', 'terminal', 'linux', 'server', 'shell', 'bash'],
+  },
+  {
+    type: 'file-read',
+    label: 'Read File',
+    icon: '📖',
+    color: '#3498db',
+    defaultData: { path: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'content', type: 'STRING', label: 'Content' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'read', 'view', 'load', 'cat', 'text', 'config', 'log'],
+  },
+  {
+    type: 'file-write',
+    label: 'Write File',
+    icon: '✍️',
+    color: '#e74c3c',
+    defaultData: { path: '', content: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+      { id: 'content', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'write', 'save', 'create', 'edit', 'modify', 'text', 'config'],
+  },
+  {
+    type: 'file-delete',
+    label: 'Delete File',
+    icon: '🗑️',
+    color: '#e74c3c',
+    defaultData: { path: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['file', 'delete', 'remove', 'rm', 'clean', 'erase'],
+  },
+  {
+    type: 'directory-list',
+    label: 'List Directory',
+    icon: '📂',
+    color: '#f39c12',
+    defaultData: { path: '.', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'path', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'files', type: 'STRING', label: 'Files' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['directory', 'list', 'folder', 'ls', 'dir', 'files', 'browse'],
+  },
+  {
+    type: 'process-start',
+    label: 'Start Process',
+    icon: '▶️',
+    color: '#27ae60',
+    defaultData: { command: '', args: '', cwd: '', ssh: false },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'command', type: 'STRING', optional: true },
+      { id: 'args', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'processId', type: 'STRING', label: 'Process ID' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'start', 'run', 'execute', 'launch', 'program', 'server', 'minecraft', 'mc'],
+  },
+  {
+    type: 'process-stop',
+    label: 'Stop Process',
+    icon: '⏹️',
+    color: '#e74c3c',
+    defaultData: { processId: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'processId', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'stop', 'kill', 'terminate', 'end', 'close', 'shutdown'],
+  },
+  {
+    type: 'process-output',
+    label: 'Get Process Output',
+    icon: '📜',
+    color: '#9b59b6',
+    defaultData: { processId: '', lines: 50 },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'processId', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'output', type: 'STRING', label: 'Output' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'output', 'logs', 'console', 'view', 'read', 'stdout', 'stderr'],
+  },
+  {
+    type: 'process-input',
+    label: 'Send to Process',
+    icon: '⌨️',
+    color: '#3498db',
+    defaultData: { processId: '', input: '' },
+    inputs: [
+      { id: 'flow', type: 'FLOW' },
+      { id: 'processId', type: 'STRING', optional: true },
+      { id: 'input', type: 'STRING', optional: true },
+    ],
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Success' },
+      { id: 'fail', type: 'FLOW', label: 'Fail' },
+    ],
+    tags: ['process', 'input', 'stdin', 'send', 'write', 'command', 'console'],
+  },
 ];
 
 function FlowEventEditor({ event, eventType, onSave, onClose }) {
@@ -1032,12 +1313,12 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
       type: eventType || 'command',
       name: '',
       description: '',
-      triggerType: eventType === 'event' ? 'messageCreate' : undefined,
+      triggerType: eventType === 'event' ? 'messageCreate' : (eventType === 'anti-hack' ? 'messageSpam' : undefined),
       flowData: { nodes: [], edges: [] },
     }
   );
   const [showTriggerSelector, setShowTriggerSelector] = useState(
-    eventType === 'event' && !event
+    (eventType === 'event' || eventType === 'anti-hack') && !event
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(eventConfig.flowData?.nodes || []);
@@ -1045,6 +1326,28 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [loopWarning, setLoopWarning] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const hasAttachedCallbacks = useRef(false);
+  const lastEventId = useRef(null);
+
+  // Sync eventConfig when opening a different event
+  useEffect(() => {
+    // Create a stable ID for the event (could be undefined for new events)
+    const currentEventId = event ? JSON.stringify({
+      name: event.name,
+      type: event.type,
+      triggerType: event.triggerType
+    }) : null;
+
+    // Only sync if this is a different event than before
+    if (event && currentEventId !== lastEventId.current) {
+      lastEventId.current = currentEventId;
+      setEventConfig(event);
+      if (event.flowData) {
+        setNodes(event.flowData.nodes || []);
+        setEdges(event.flowData.edges || []);
+      }
+    }
+  }, [event, setNodes, setEdges]);
 
   // Filter nodes based on search term
   const filterNodes = (nodes) => {
@@ -1065,6 +1368,27 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
   const filteredDataNodes = filterNodes(DATA_NODES);
   const filteredActionNodes = filterNodes(ACTION_TYPES);
 
+  // Define updateNodeData before it's used in useEffects
+  const updateNodeData = useCallback(
+    (nodeId, newConfig) => {
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id === nodeId) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                config: newConfig,
+              },
+            };
+          }
+          return node;
+        })
+      );
+    },
+    [setNodes]
+  );
+
   // Auto-add trigger node if it doesn't exist
   useEffect(() => {
     if (nodes.length === 0 || !nodes.find(n => n.type === 'triggerNode')) {
@@ -1074,6 +1398,8 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         triggerConfig = TRIGGER_TYPES.command;
       } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
         triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+      } else if (eventConfig.type === 'anti-hack' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageSpam;
       } else {
         triggerConfig = TRIGGER_TYPES.command;
       }
@@ -1083,6 +1409,7 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         // Command triggers have base outputs + options
         const baseOutputs = [
           { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'interaction', type: 'INTERACTION', label: 'Interaction' },
           { id: 'user', type: 'USER', label: 'User' },
           { id: 'channel', type: 'CHANNEL', label: 'Channel' },
           { id: 'guild', type: 'GUILD', label: 'Guild' },
@@ -1094,7 +1421,7 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         }));
         outputs = [...baseOutputs, ...optionOutputs];
       } else {
-        // Event triggers have predefined outputs
+        // Event triggers and anti-hack triggers have predefined outputs
         outputs = triggerConfig.outputs || [];
       }
 
@@ -1114,6 +1441,32 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
     }
   }, []);
 
+  // Ensure all loaded nodes have the onUpdate callback attached (run once on mount)
+  useEffect(() => {
+    if (hasAttachedCallbacks.current) return;
+
+    const needsUpdate = nodes.some(node =>
+      (node.type === 'actionNode' || node.type === 'dataNode') &&
+      !node.data.onUpdate
+    );
+
+    if (needsUpdate) {
+      hasAttachedCallbacks.current = true;
+      setNodes(nodes.map(node => {
+        if ((node.type === 'actionNode' || node.type === 'dataNode') && !node.data.onUpdate) {
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              onUpdate: updateNodeData,
+            },
+          };
+        }
+        return node;
+      }));
+    }
+  }, [nodes, setNodes, updateNodeData]);
+
   // Update trigger node outputs when config changes
   useEffect(() => {
     const triggerNode = nodes.find(n => n.type === 'triggerNode');
@@ -1126,6 +1479,7 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         triggerConfig = TRIGGER_TYPES.command;
         const baseOutputs = [
           { id: 'flow', type: 'FLOW', label: 'Flow' },
+          { id: 'interaction', type: 'INTERACTION', label: 'Interaction' },
           { id: 'user', type: 'USER', label: 'User' },
           { id: 'channel', type: 'CHANNEL', label: 'Channel' },
           { id: 'guild', type: 'GUILD', label: 'Guild' },
@@ -1138,6 +1492,9 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         newOutputs = [...baseOutputs, ...optionOutputs];
       } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
         triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+        newOutputs = triggerConfig.outputs || [];
+      } else if (eventConfig.type === 'anti-hack' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageSpam;
         newOutputs = triggerConfig.outputs || [];
       } else {
         return; // No valid config
@@ -1357,26 +1714,6 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
     setNodes((nds) => [...nds, newNode]);
   };
 
-  const updateNodeData = useCallback(
-    (nodeId, newConfig) => {
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === nodeId) {
-            return {
-              ...node,
-              data: {
-                ...node.data,
-                config: newConfig,
-              },
-            };
-          }
-          return node;
-        })
-      );
-    },
-    [setNodes]
-  );
-
   const deleteNode = useCallback(
     (nodeId) => {
       if (nodeId === 'trigger-node') return; // Can't delete trigger node
@@ -1527,18 +1864,84 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
     },
   ];
 
+  // Anti-Hack trigger options
+  const ANTIHACK_TRIGGER_OPTIONS = [
+    {
+      key: 'messageSpam',
+      label: 'Message Spam',
+      icon: '⚡',
+      description: 'Detect users sending too many messages too quickly',
+      color: '#ed4245',
+    },
+    {
+      key: 'suspiciousEdit',
+      label: 'Suspicious Edits',
+      icon: '✏️',
+      description: 'Detect rapid or unusual message editing patterns',
+      color: '#f39c12',
+    },
+    {
+      key: 'massDelete',
+      label: 'Mass Delete',
+      icon: '🗑️',
+      description: 'Detect users deleting many messages rapidly',
+      color: '#e74c3c',
+    },
+    {
+      key: 'linkSpam',
+      label: 'Link Spam',
+      icon: '🔗',
+      description: 'Detect users posting too many links',
+      color: '#3498db',
+    },
+    {
+      key: 'attachmentSpam',
+      label: 'Attachment Spam',
+      icon: '📎',
+      description: 'Detect users posting too many files/images',
+      color: '#9b59b6',
+    },
+    {
+      key: 'mentionSpam',
+      label: 'Mention Spam',
+      icon: '@',
+      description: 'Detect users @mentioning too many people',
+      color: '#e67e22',
+    },
+    {
+      key: 'emojiSpam',
+      label: 'Emoji Spam',
+      icon: '😂',
+      description: 'Detect messages with excessive emojis',
+      color: '#faa61a',
+    },
+    {
+      key: 'duplicateMessages',
+      label: 'Duplicate Messages',
+      icon: '📋',
+      description: 'Detect users sending the same message repeatedly',
+      color: '#95a5a6',
+    },
+  ];
+
   if (showTriggerSelector) {
+    const isAntiHack = eventType === 'anti-hack';
+    const triggersToShow = isAntiHack ? ANTIHACK_TRIGGER_OPTIONS : TRIGGER_OPTIONS;
+    const headerText = isAntiHack
+      ? 'Select what suspicious behavior should trigger your anti-hack protection'
+      : 'Select what Discord event should trigger your bot\'s actions';
+
     return (
-      <Modal isOpen={true} onClose={onClose} title="Choose Event Trigger" className="flow-editor-modal">
+      <Modal isOpen={true} onClose={onClose} title={isAntiHack ? "Choose Anti-Hack Detection" : "Choose Event Trigger"} className="flow-editor-modal">
         <div className="event-type-selector">
           <div className="selector-header">
-            <h2>Choose a Trigger Type</h2>
+            <h2>{isAntiHack ? '🛡️ Choose Detection Type' : 'Choose a Trigger Type'}</h2>
             <p style={{ color: '#b5bac1', fontSize: '14px', marginTop: '8px' }}>
-              Select what Discord event should trigger your bot's actions
+              {headerText}
             </p>
           </div>
           <div className="event-types-grid">
-            {TRIGGER_OPTIONS.map((trigger) => (
+            {triggersToShow.map((trigger) => (
               <div
                 key={trigger.key}
                 className="event-type-card"
