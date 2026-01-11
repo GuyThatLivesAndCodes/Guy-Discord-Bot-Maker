@@ -658,7 +658,7 @@ class BotRunner {
             if (message.author.bot) return; // Ignore bot messages
             try {
               this.log('info', `Executing blueprint event "${event.name}" for messageCreate`);
-              await executeBlueprintEvent('messageCreate', { message }, event.flowData, this);
+              await executeBlueprintEvent('messageCreate', { message }, event, this);
             } catch (error) {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
@@ -670,7 +670,7 @@ class BotRunner {
           this.client.on('messageDelete', async (message) => {
             try {
               this.log('info', `Executing blueprint event "${event.name}" for messageDelete`);
-              await executeBlueprintEvent('messageDelete', { message }, event.flowData, this);
+              await executeBlueprintEvent('messageDelete', { message }, event, this);
             } catch (error) {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
@@ -682,7 +682,7 @@ class BotRunner {
           this.client.on('guildMemberAdd', async (member) => {
             try {
               this.log('info', `Executing blueprint event "${event.name}" for guildMemberAdd`);
-              await executeBlueprintEvent('guildMemberAdd', { member }, event.flowData, this);
+              await executeBlueprintEvent('guildMemberAdd', { member }, event, this);
             } catch (error) {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
@@ -694,7 +694,7 @@ class BotRunner {
           this.client.on('guildMemberRemove', async (member) => {
             try {
               this.log('info', `Executing blueprint event "${event.name}" for guildMemberRemove`);
-              await executeBlueprintEvent('guildMemberRemove', { member }, event.flowData, this);
+              await executeBlueprintEvent('guildMemberRemove', { member }, event, this);
             } catch (error) {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
@@ -706,7 +706,7 @@ class BotRunner {
           this.client.on('messageReactionAdd', async (reaction, user) => {
             try {
               this.log('info', `Executing blueprint event "${event.name}" for messageReactionAdd`);
-              await executeBlueprintEvent('messageReactionAdd', { reaction, user }, event.flowData, this);
+              await executeBlueprintEvent('messageReactionAdd', { reaction, user }, event, this);
             } catch (error) {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
@@ -718,7 +718,7 @@ class BotRunner {
           this.client.on('voiceStateUpdate', async (oldState, newState) => {
             try {
               this.log('info', `Executing blueprint event "${event.name}" for voiceStateUpdate`);
-              await executeBlueprintEvent('voiceStateUpdate', { oldState, newState }, event.flowData, this);
+              await executeBlueprintEvent('voiceStateUpdate', { oldState, newState }, event, this);
             } catch (error) {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
@@ -736,7 +736,7 @@ class BotRunner {
           this.client.once('ready', async (client) => {
             try {
               this.log('info', `Executing blueprint event "${event.name}" for ready`);
-              await executeBlueprintEvent('ready', { client }, event.flowData, this);
+              await executeBlueprintEvent('ready', { client }, event, this);
             } catch (error) {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
@@ -1153,7 +1153,7 @@ class BotRunner {
     if (isBlueprintEvent(command)) {
       try {
         this.log('info', `Executing blueprint command: ${command.name}`);
-        await executeBlueprintCommand(interaction, command.flowData, this);
+        await executeBlueprintCommand(interaction, command, this);
         return;
       } catch (error) {
         this.log('error', `Blueprint command error: ${error.message}`);
