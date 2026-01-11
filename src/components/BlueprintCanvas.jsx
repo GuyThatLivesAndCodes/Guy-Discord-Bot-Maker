@@ -27,6 +27,17 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
   const reactFlowWrapper = useRef(null);
   const [reactFlowInstance, setReactFlowInstance] = useState(null);
 
+  // Handle config changes for all nodes
+  const handleConfigChange = useCallback((nodeId, newConfig) => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === nodeId
+          ? { ...n, data: { ...n.data, config: newConfig } }
+          : n
+      )
+    );
+  }, [setNodes]);
+
   // Connection validation
   const isValidConnection = useCallback((connection) => {
     const sourceNode = nodes.find((n) => n.id === connection.source);
@@ -100,19 +111,21 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
         }
       }
 
+      const isExec = params.sourceHandle.includes('exec-out');
       const newEdge = {
         ...params,
         type: 'smoothstep',
-        animated: params.sourceHandle.includes('exec-out'),
+        animated: isExec,
         style: {
           stroke: edgeColor,
-          strokeWidth: params.sourceHandle.includes('exec-out') ? 3 : 2,
+          strokeWidth: isExec ? 4 : 2.5,
+          filter: `drop-shadow(0 0 ${isExec ? '6px' : '4px'} ${edgeColor}40)`,
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: edgeColor,
-          width: 20,
-          height: 20,
+          width: isExec ? 24 : 20,
+          height: isExec ? 24 : 20,
         },
       };
 
@@ -120,6 +133,7 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
     },
     [isValidConnection, setEdges, nodes]
   );
+
 
   // Add node from palette
   const addNode = useCallback(
@@ -146,15 +160,6 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
           hasConfig: definition.hasConfig,
           defaultConfig: definition.defaultConfig,
           config: definition.defaultConfig ? { ...definition.defaultConfig } : {},
-          onConfigChange: (newConfig) => {
-            setNodes((nds) =>
-              nds.map((n) =>
-                n.id === newNode.id
-                  ? { ...n, data: { ...n.data, config: newConfig } }
-                  : n
-              )
-            );
-          },
         },
       };
 
@@ -401,7 +406,13 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
       {/* React Flow Canvas */}
       <ReactFlow
         ref={reactFlowWrapper}
-        nodes={nodes}
+        nodes={nodes.map(node => ({
+          ...node,
+          data: {
+            ...node.data,
+            onConfigChange: (newConfig) => handleConfigChange(node.id, newConfig)
+          }
+        }))}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
@@ -410,14 +421,28 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-left"
-        style={{ background: '#1a1a1a' }}
-        connectionLineStyle={{ stroke: '#faa61a', strokeWidth: 2 }}
+        style={{ background: 'linear-gradient(135deg, #1a1a1a 0%, #151515 100%)' }}
+        connectionLineStyle={{
+          stroke: '#faa61a',
+          strokeWidth: 3,
+          filter: 'drop-shadow(0 0 6px rgba(250,166,26,0.6))'
+        }}
         defaultEdgeOptions={{
           type: 'smoothstep',
           animated: false,
+          style: {
+            filter: 'drop-shadow(0 0 3px rgba(0,0,0,0.5))'
+          }
         }}
       >
-        <Background color="#333" gap={25} />
+        <Background
+          color="#2a2a2a"
+          gap={25}
+          size={2}
+          style={{
+            opacity: 0.3
+          }}
+        />
         <Controls />
         <MiniMap
           style={{ background: '#2b2b2b' }}

@@ -294,7 +294,24 @@ async function evaluateDataPin(node, targetHandle, flowData, context) {
 
   // If source is a constant node, return config value
   if (sourceNode.data.hasConfig && sourceNode.data.config) {
+    const definitionId = sourceNode.data?.definitionId;
     const outputId = edge.sourceHandle.replace('data-out-', '');
+
+    // Handle option nodes specially - they read from interaction context
+    if (definitionId && definitionId.startsWith('OPTION_')) {
+      const optionName = sourceNode.data.config.optionName;
+      if (!optionName) {
+        console.warn('[Blueprint] Option node has no option name configured');
+        return undefined;
+      }
+      // Get value from context (set by interaction)
+      const contextKey = `option_${optionName.toLowerCase().replace(/[^a-z0-9_-]/g, '_')}`;
+      const value = context[contextKey];
+      context.computed.set(cacheKey, value);
+      return value;
+    }
+
+    // Regular constant nodes
     const value = sourceNode.data.config[outputId] !== undefined
       ? sourceNode.data.config[outputId]
       : sourceNode.data.config.value;
@@ -424,6 +441,14 @@ function computePureNode(nodeId, inputs, context) {
       return String(inputs.value ?? '');
     case 'pure-to-number':
       return Number(inputs.value) || 0;
+
+    // Command Options - read values from interaction context
+    case 'OPTION_STRING':
+    case 'pure-option-string': {
+      // Option nodes need access to the node config, not inputs
+      // The config is on the node itself
+      return undefined; // Will be handled specially in evaluateDataPin
+    }
 
     default:
       console.warn('[Blueprint] Unknown pure node:', nodeId);

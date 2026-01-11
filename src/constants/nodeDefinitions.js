@@ -70,6 +70,11 @@ export const EventNodes = {
     ],
     discordEvent: 'interactionCreate',
     hasCommandOptions: true,
+    hasConfig: true,
+    defaultConfig: {
+      commandName: '',
+      commandDescription: 'A slash command',
+    },
   },
 };
 
@@ -185,6 +190,139 @@ export const PureNodes = {
     ],
     hasConfig: true,
     defaultConfig: { value: false },
+  },
+
+  // Command Options - for slash commands
+  OPTION_STRING: {
+    id: 'pure-option-string',
+    category: NodeCategory.PURE,
+    label: 'String Option',
+    description: 'A text input option for slash commands',
+    icon: '📝',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.STRING },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      optionName: '',
+      description: 'A text option',
+      required: false,
+    },
+    isCommandOption: true,
+    optionType: 'STRING',
+  },
+
+  OPTION_NUMBER: {
+    id: 'pure-option-number',
+    category: NodeCategory.PURE,
+    label: 'Number Option',
+    description: 'A number input option for slash commands',
+    icon: '🔢',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.NUMBER },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      optionName: '',
+      description: 'A number option',
+      required: false,
+    },
+    isCommandOption: true,
+    optionType: 'NUMBER',
+  },
+
+  OPTION_BOOLEAN: {
+    id: 'pure-option-boolean',
+    category: NodeCategory.PURE,
+    label: 'Boolean Option',
+    description: 'A true/false option for slash commands',
+    icon: '✓',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.BOOLEAN },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      optionName: '',
+      description: 'A true/false option',
+      required: false,
+    },
+    isCommandOption: true,
+    optionType: 'BOOLEAN',
+  },
+
+  OPTION_USER: {
+    id: 'pure-option-user',
+    category: NodeCategory.PURE,
+    label: 'User Option',
+    description: 'A user picker option for slash commands',
+    icon: '👤',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.USER },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      optionName: '',
+      description: 'A user option',
+      required: false,
+    },
+    isCommandOption: true,
+    optionType: 'USER',
+  },
+
+  OPTION_CHANNEL: {
+    id: 'pure-option-channel',
+    category: NodeCategory.PURE,
+    label: 'Channel Option',
+    description: 'A channel picker option for slash commands',
+    icon: '#',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.CHANNEL },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      optionName: '',
+      description: 'A channel option',
+      required: false,
+    },
+    isCommandOption: true,
+    optionType: 'CHANNEL',
+  },
+
+  OPTION_ROLE: {
+    id: 'pure-option-role',
+    category: NodeCategory.PURE,
+    label: 'Role Option',
+    description: 'A role picker option for slash commands',
+    icon: '🎭',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.ROLE },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      optionName: '',
+      description: 'A role option',
+      required: false,
+    },
+    isCommandOption: true,
+    optionType: 'ROLE',
   },
 };
 

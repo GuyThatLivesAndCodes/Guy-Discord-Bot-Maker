@@ -107,11 +107,16 @@ function createEventContext(eventType, eventData) {
       context.channel = eventData.interaction.channel;
       context.guild = eventData.interaction.guild;
 
-      // Add command options
+      // Add command options - handle both legacy and new option systems
       if (eventData.interaction.options) {
-        eventData.interaction.options.data.forEach((opt) => {
-          context[opt.name] = opt.value;
-        });
+        // For slash commands, options come from interaction.options
+        const options = eventData.interaction.options;
+        if (options.data && Array.isArray(options.data)) {
+          options.data.forEach((opt) => {
+            // Store option values for option nodes to access
+            context[`option_${opt.name}`] = opt.value || opt.user || opt.channel || opt.role;
+          });
+        }
       }
       break;
 
@@ -134,6 +139,70 @@ function isBlueprintEvent(eventConfig) {
   if (!eventConfig.flowData || !eventConfig.flowData.nodes) return false;
 
   return eventConfig.flowData.nodes.some((node) => node.type === 'blueprintNode');
+}
+
+/**
+ * Extract slash command configuration from a blueprint
+ * Looks for ON_SLASH_COMMAND node and associated option nodes
+ */
+function extractCommandConfiguration(flowData) {
+  if (!flowData || !flowData.nodes) {
+    return null;
+  }
+
+  // Find the ON_SLASH_COMMAND event node
+  const commandNode = flowData.nodes.find((node) =>
+    node.type === 'blueprintNode' && node.data?.definitionId === 'ON_SLASH_COMMAND'
+  );
+
+  if (!commandNode) {
+    return null;
+  }
+
+  // Get command name and description from node config
+  const commandName = commandNode.data?.config?.commandName || '';
+  const commandDescription = commandNode.data?.config?.commandDescription || 'A slash command';
+
+  if (!commandName) {
+    console.warn('[Blueprint] ON_SLASH_COMMAND node has no command name configured');
+    return null;
+  }
+
+  // Find all option nodes in the graph
+  const optionNodes = flowData.nodes.filter((node) =>
+    node.type === 'blueprintNode' &&
+    node.data?.definitionId &&
+    node.data.definitionId.startsWith('OPTION_')
+  );
+
+  // Build options array
+  const options = optionNodes.map((optionNode) => {
+    const optionDef = optionNode.data?.definitionId;
+    const config = optionNode.data?.config || {};
+
+    // Map option definition IDs to Discord types
+    const typeMapping = {
+      'OPTION_STRING': 'STRING',
+      'OPTION_NUMBER': 'NUMBER',
+      'OPTION_BOOLEAN': 'BOOLEAN',
+      'OPTION_USER': 'USER',
+      'OPTION_CHANNEL': 'CHANNEL',
+      'OPTION_ROLE': 'ROLE',
+    };
+
+    return {
+      name: config.optionName || 'option',
+      description: config.description || 'An option',
+      required: config.required || false,
+      type: typeMapping[optionDef] || 'STRING',
+    };
+  }).filter(opt => opt.name && opt.name !== 'option'); // Filter out unconfigured options
+
+  return {
+    name: commandName,
+    description: commandDescription,
+    options: options,
+  };
 }
 
 /**
@@ -236,4 +305,5 @@ module.exports = {
   findEventNode,
   createEventContext,
   isBlueprintEvent,
+  extractCommandConfiguration,
 };

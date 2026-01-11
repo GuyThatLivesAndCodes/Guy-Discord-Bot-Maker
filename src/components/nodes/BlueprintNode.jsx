@@ -36,11 +36,13 @@ const BlueprintNode = ({ data, selected }) => {
         borderRadius: '8px',
         overflow: 'hidden',
         boxShadow: selected
-          ? '0 0 0 2px #faa61a, 0 4px 12px rgba(0,0,0,0.3)'
-          : '0 2px 8px rgba(0,0,0,0.2)',
-        transition: 'box-shadow 0.2s ease',
+          ? '0 0 0 3px #faa61a, 0 8px 24px rgba(0,0,0,0.5), 0 0 60px rgba(250,166,26,0.3)'
+          : '0 4px 16px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3)',
+        transition: 'all 0.2s ease',
         minWidth: '200px',
-        background: '#2b2b2b',
+        background: 'linear-gradient(135deg, #2b2b2b 0%, #252525 100%)',
+        transform: selected ? 'scale(1.02)' : 'scale(1)',
+        border: selected ? 'none' : '1px solid rgba(255,255,255,0.1)',
       }}
     >
       {/* Header */}
@@ -101,6 +103,8 @@ const BlueprintNode = ({ data, selected }) => {
                   border: `${PIN_BORDER}px solid #1a1a1a`,
                   borderRadius: '50%',
                   left: `-${PIN_SIZE / 2 + 2}px`,
+                  boxShadow: '0 0 8px rgba(255,255,255,0.5), inset 0 0 4px rgba(0,0,0,0.3)',
+                  transition: 'all 0.2s ease',
                 }}
               />
               <span
@@ -155,34 +159,68 @@ const BlueprintNode = ({ data, selected }) => {
 
           {/* Configuration UI (for constant nodes, etc.) */}
           {data.hasConfig && onConfigChange && (
-            <div style={{ margin: '8px 0' }}>
-              {Object.keys(data.defaultConfig || {}).map((key) => (
-                <div key={key} style={{ marginBottom: '4px' }}>
-                  <input
-                    type={typeof config[key] === 'number' ? 'number' : typeof config[key] === 'boolean' ? 'checkbox' : 'text'}
-                    value={typeof config[key] === 'boolean' ? undefined : (config[key] ?? data.defaultConfig[key])}
-                    checked={typeof config[key] === 'boolean' ? (config[key] ?? data.defaultConfig[key]) : undefined}
-                    onChange={(e) => {
-                      const value = typeof config[key] === 'number'
-                        ? parseFloat(e.target.value)
-                        : typeof config[key] === 'boolean'
-                        ? e.target.checked
-                        : e.target.value;
-                      onConfigChange({ ...config, [key]: value });
-                    }}
-                    placeholder={key}
-                    style={{
-                      width: '100%',
-                      padding: '4px 8px',
-                      background: '#2b2b2b',
-                      border: '1px solid #555',
-                      borderRadius: '4px',
-                      color: '#fff',
-                      fontSize: '11px',
-                    }}
-                  />
-                </div>
-              ))}
+            <div style={{ margin: '8px 0', padding: '8px', background: '#2b2b2b', borderRadius: '4px' }}>
+              {Object.keys(data.defaultConfig || {}).map((key) => {
+                const isCheckbox = typeof config[key] === 'boolean' || typeof data.defaultConfig[key] === 'boolean';
+                const fieldLabel = key === 'commandName' ? 'Command' :
+                                 key === 'commandDescription' ? 'Cmd Description' :
+                                 key === 'optionName' ? 'Option Name' :
+                                 key === 'description' ? 'Description' :
+                                 key === 'required' ? 'Required?' :
+                                 key === 'value' ? 'Value' : key;
+
+                return (
+                  <div key={key} style={{ marginBottom: '6px' }}>
+                    <label style={{
+                      display: 'block',
+                      fontSize: '10px',
+                      color: '#aaa',
+                      marginBottom: '2px',
+                      fontWeight: 'bold'
+                    }}>
+                      {fieldLabel}
+                    </label>
+                    {isCheckbox ? (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={config[key] ?? data.defaultConfig[key]}
+                          onChange={(e) => {
+                            onConfigChange({ ...config, [key]: e.target.checked });
+                          }}
+                          style={{
+                            cursor: 'pointer',
+                          }}
+                        />
+                        <span style={{ fontSize: '11px', color: '#fff' }}>
+                          {config[key] ?? data.defaultConfig[key] ? 'Yes' : 'No'}
+                        </span>
+                      </label>
+                    ) : (
+                      <input
+                        type={typeof config[key] === 'number' || typeof data.defaultConfig[key] === 'number' ? 'number' : 'text'}
+                        value={config[key] ?? data.defaultConfig[key]}
+                        onChange={(e) => {
+                          const value = typeof config[key] === 'number' || typeof data.defaultConfig[key] === 'number'
+                            ? parseFloat(e.target.value) || 0
+                            : e.target.value;
+                          onConfigChange({ ...config, [key]: value });
+                        }}
+                        placeholder={fieldLabel}
+                        style={{
+                          width: '100%',
+                          padding: '4px 8px',
+                          background: '#1a1a1a',
+                          border: '1px solid #555',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          fontSize: '11px',
+                        }}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
 

@@ -411,7 +411,55 @@ class BotRunner {
   }
 
   async registerCommands(commandEvents) {
+    const { isBlueprintEvent, extractCommandConfiguration } = require('./blueprintExecutor');
+
     const commands = commandEvents.map(cmd => {
+      // Check if this is a blueprint event with command configuration
+      if (isBlueprintEvent(cmd) && cmd.flowData) {
+        const blueprintConfig = extractCommandConfiguration(cmd.flowData);
+
+        if (blueprintConfig) {
+          // Use blueprint configuration
+          const command = {
+            name: blueprintConfig.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+            description: blueprintConfig.description || 'A slash command',
+          };
+
+          // Add options from blueprint
+          if (blueprintConfig.options && blueprintConfig.options.length > 0) {
+            command.options = blueprintConfig.options.map(opt => {
+              const option = {
+                name: opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+                description: opt.description || `${opt.name} parameter`,
+                required: opt.required || false,
+              };
+
+              // Map our types to Discord's ApplicationCommandOptionType
+              const typeMap = {
+                'STRING': 3,
+                'NUMBER': 10,
+                'BOOLEAN': 5,
+                'USER': 6,
+                'CHANNEL': 7,
+                'ROLE': 8,
+                'ATTACHMENT': 11,
+              };
+
+              option.type = typeMap[opt.type] || 3; // Default to STRING
+              return option;
+            });
+          }
+
+          // Store blueprint config back to cmd for execution
+          cmd.name = blueprintConfig.name;
+          cmd.description = blueprintConfig.description;
+          cmd.options = blueprintConfig.options;
+
+          return command;
+        }
+      }
+
+      // Fallback to legacy command configuration
       const command = {
         name: cmd.name,
         description: cmd.description || 'No description provided',
