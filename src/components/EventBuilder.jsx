@@ -50,8 +50,12 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
   const [showFlowEditor, setShowFlowEditor] = useState(false);
   const [showEventTypeSelector, setShowEventTypeSelector] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showEventConfig, setShowEventConfig] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState(null);
   const [selectedMode, setSelectedMode] = useState('basic');
+  const [eventName, setEventName] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
+  const [eventTriggerType, setEventTriggerType] = useState('messageCreate');
 
   const handleSave = (event) => {
     if (editingIndex !== null) {
@@ -62,8 +66,12 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
     }
     setShowFlowEditor(false);
     setShowModeSelector(false);
+    setShowEventConfig(false);
     setSelectedEventType(null);
     setSelectedMode('basic');
+    setEventName('');
+    setEventDescription('');
+    setEventTriggerType('messageCreate');
   };
 
   const handleClose = () => {
@@ -71,8 +79,12 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
     setShowFlowEditor(false);
     setShowEventTypeSelector(false);
     setShowModeSelector(false);
+    setShowEventConfig(false);
     setSelectedEventType(null);
     setSelectedMode('basic');
+    setEventName('');
+    setEventDescription('');
+    setEventTriggerType('messageCreate');
   };
 
   const handleSelectEventType = (eventType) => {
@@ -90,13 +102,141 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
     }
     setSelectedMode(mode.mode);
     setShowModeSelector(false);
+    setShowEventConfig(true); // Show config form next
+  };
+
+  const handleConfigComplete = () => {
+    // Validate name
+    if (selectedEventType === 'command' && !eventName.trim()) {
+      alert('Please enter a command name');
+      return;
+    }
+    if (selectedEventType === 'event' && !eventName.trim()) {
+      alert('Please enter an event name');
+      return;
+    }
+
+    setShowEventConfig(false);
     setShowFlowEditor(true);
   };
 
   const handleEdit = (index) => {
+    const event = events[index];
     setEditingIndex(index);
+    setSelectedEventType(event.type);
+    setEventName(event.name || '');
+    setEventDescription(event.description || '');
+    setEventTriggerType(event.triggerType || 'messageCreate');
     setShowFlowEditor(true);
   };
+
+  // Event configuration screen
+  if (showEventConfig) {
+    return (
+      <div className="event-type-selector">
+        <div className="selector-header">
+          <h2>Configure Event</h2>
+          <button onClick={handleClose} className="secondary">
+            Cancel
+          </button>
+        </div>
+        <div style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#fff' }}>
+              {selectedEventType === 'command' ? 'Command Name' : 'Event Name'}
+            </label>
+            <input
+              type="text"
+              value={eventName}
+              onChange={(e) => setEventName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+              placeholder={selectedEventType === 'command' ? 'hello' : 'My Custom Event'}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                border: '2px solid #444',
+                borderRadius: '8px',
+                background: '#2b2b2b',
+                color: '#fff',
+              }}
+            />
+            {selectedEventType === 'command' && (
+              <p style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
+                Command will be: /{eventName || 'yourcommand'}
+              </p>
+            )}
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#fff' }}>
+              Description
+            </label>
+            <textarea
+              value={eventDescription}
+              onChange={(e) => setEventDescription(e.target.value)}
+              placeholder="What does this event do?"
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '12px',
+                fontSize: '14px',
+                border: '2px solid #444',
+                borderRadius: '8px',
+                background: '#2b2b2b',
+                color: '#fff',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+
+          {selectedEventType === 'event' && (
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#fff' }}>
+                Trigger Type
+              </label>
+              <select
+                value={eventTriggerType}
+                onChange={(e) => setEventTriggerType(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '14px',
+                  border: '2px solid #444',
+                  borderRadius: '8px',
+                  background: '#2b2b2b',
+                  color: '#fff',
+                }}
+              >
+                <option value="messageCreate">Message Created</option>
+                <option value="messageDelete">Message Deleted</option>
+                <option value="guildMemberAdd">Member Joined</option>
+                <option value="guildMemberRemove">Member Left</option>
+                <option value="messageReactionAdd">Reaction Added</option>
+                <option value="voiceStateUpdate">Voice State Changed</option>
+              </select>
+            </div>
+          )}
+
+          <button
+            onClick={handleConfigComplete}
+            style={{
+              width: '100%',
+              padding: '14px',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              background: '#3498db',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+            }}
+          >
+            Continue to Blueprint Editor →
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Mode selector screen
   if (showModeSelector) {
@@ -163,8 +303,9 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
           onSave={(flowData) => {
             const event = editingIndex !== null ? events[editingIndex] : {
               type: selectedEventType,
-              name: selectedEventType === 'command' ? 'newcommand' : '',
-              description: '',
+              name: eventName,
+              description: eventDescription,
+              triggerType: selectedEventType === 'event' ? eventTriggerType : undefined,
               flowData: { nodes: [], edges: [] }
             };
             handleSave({ ...event, flowData });
