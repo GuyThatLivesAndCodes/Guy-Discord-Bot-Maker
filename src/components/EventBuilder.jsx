@@ -27,11 +27,31 @@ const EVENT_TYPES = [
   },
 ];
 
+// Event modes
+const EVENT_MODES = [
+  {
+    mode: 'basic',
+    label: 'Basic Event',
+    icon: '🎯',
+    description: 'Simple blueprint system with essential nodes. Perfect for getting started!',
+    available: true,
+  },
+  {
+    mode: 'advanced',
+    label: 'Advanced Event',
+    icon: '🚀',
+    description: 'Full-featured system with all nodes, variables, and advanced features.',
+    available: false,
+  },
+];
+
 function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [showFlowEditor, setShowFlowEditor] = useState(false);
   const [showEventTypeSelector, setShowEventTypeSelector] = useState(false);
+  const [showModeSelector, setShowModeSelector] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState(null);
+  const [selectedMode, setSelectedMode] = useState('basic');
 
   const handleSave = (event) => {
     if (editingIndex !== null) {
@@ -41,14 +61,18 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
       onAddEvent(event);
     }
     setShowFlowEditor(false);
+    setShowModeSelector(false);
     setSelectedEventType(null);
+    setSelectedMode('basic');
   };
 
   const handleClose = () => {
     setEditingIndex(null);
     setShowFlowEditor(false);
     setShowEventTypeSelector(false);
+    setShowModeSelector(false);
     setSelectedEventType(null);
+    setSelectedMode('basic');
   };
 
   const handleSelectEventType = (eventType) => {
@@ -57,6 +81,15 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
     }
     setSelectedEventType(eventType.type);
     setShowEventTypeSelector(false);
+    setShowModeSelector(true); // Show mode selector next
+  };
+
+  const handleSelectMode = (mode) => {
+    if (!mode.available) {
+      return;
+    }
+    setSelectedMode(mode.mode);
+    setShowModeSelector(false);
     setShowFlowEditor(true);
   };
 
@@ -65,6 +98,35 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
     setShowFlowEditor(true);
   };
 
+  // Mode selector screen
+  if (showModeSelector) {
+    return (
+      <div className="event-type-selector">
+        <div className="selector-header">
+          <h2>Choose Event Mode</h2>
+          <button onClick={handleClose} className="secondary">
+            Cancel
+          </button>
+        </div>
+        <div className="event-types-grid">
+          {EVENT_MODES.map((mode) => (
+            <div
+              key={mode.mode}
+              className={`event-type-card ${!mode.available ? 'disabled' : ''}`}
+              onClick={() => handleSelectMode(mode)}
+            >
+              <div className="event-type-icon">{mode.icon}</div>
+              <h3>{mode.label}</h3>
+              <p>{mode.description}</p>
+              {!mode.available && <div className="coming-soon-badge">Coming Soon</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Event type selector screen
   if (showEventTypeSelector) {
     return (
       <div className="event-type-selector">
