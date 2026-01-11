@@ -18,7 +18,7 @@ const nodeTypes = {
   blueprintNode: BlueprintNode,
 };
 
-const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave, onClose }) => {
+const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '', eventDescription = '', onSave, onClose, onOpenSettings }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [searchQuery, setSearchQuery] = useState('');
@@ -193,6 +193,7 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave, onClose
           position: 'absolute',
           top: 10,
           left: 10,
+          right: 10,
           zIndex: 10,
           display: 'flex',
           gap: '8px',
@@ -200,6 +201,7 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave, onClose
           padding: '8px',
           borderRadius: '8px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          alignItems: 'center',
         }}
       >
         <button
@@ -216,6 +218,42 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave, onClose
         >
           {showNodePalette ? '✕ Close' : '+ Add Node'}
         </button>
+
+        {/* Event Name Display */}
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          paddingLeft: '16px',
+        }}>
+          <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '16px' }}>
+            {eventName || 'Unnamed Event'}
+          </span>
+          {eventDescription && (
+            <span style={{ color: '#888', fontSize: '12px' }}>
+              • {eventDescription}
+            </span>
+          )}
+        </div>
+
+        {onOpenSettings && (
+          <button
+            onClick={onOpenSettings}
+            style={{
+              padding: '8px 16px',
+              background: '#9b59b6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+            title="Event Settings"
+          >
+            ⚙️ Settings
+          </button>
+        )}
         <button
           onClick={handleSave}
           style={{

@@ -2,31 +2,6 @@ import React, { useState } from 'react';
 import BlueprintCanvas from './BlueprintCanvas';
 import './EventBuilder.css';
 
-// Event types
-const EVENT_TYPES = [
-  {
-    type: 'command',
-    label: 'Command',
-    icon: '⚡',
-    description: 'Triggered when a user runs a slash command',
-    available: true,
-  },
-  {
-    type: 'event',
-    label: 'Event Trigger',
-    icon: '🎯',
-    description: 'Triggered by Discord events (message, member join, reactions, etc.)',
-    available: true,
-  },
-  {
-    type: 'anti-hack',
-    label: 'Anti-Hack',
-    icon: '🛡️',
-    description: 'Detect and prevent hacked clients, spam, and suspicious behavior',
-    available: true,
-  },
-];
-
 // Event modes
 const EVENT_MODES = [
   {
@@ -48,14 +23,12 @@ const EVENT_MODES = [
 function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [showFlowEditor, setShowFlowEditor] = useState(false);
-  const [showEventTypeSelector, setShowEventTypeSelector] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
   const [showEventConfig, setShowEventConfig] = useState(false);
-  const [selectedEventType, setSelectedEventType] = useState(null);
   const [selectedMode, setSelectedMode] = useState('basic');
   const [eventName, setEventName] = useState('');
   const [eventDescription, setEventDescription] = useState('');
-  const [eventTriggerType, setEventTriggerType] = useState('messageCreate');
+  const [showSettings, setShowSettings] = useState(false);
 
   const handleSave = (event) => {
     if (editingIndex !== null) {
@@ -67,33 +40,21 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
     setShowFlowEditor(false);
     setShowModeSelector(false);
     setShowEventConfig(false);
-    setSelectedEventType(null);
     setSelectedMode('basic');
     setEventName('');
     setEventDescription('');
-    setEventTriggerType('messageCreate');
+    setShowSettings(false);
   };
 
   const handleClose = () => {
     setEditingIndex(null);
     setShowFlowEditor(false);
-    setShowEventTypeSelector(false);
     setShowModeSelector(false);
     setShowEventConfig(false);
-    setSelectedEventType(null);
     setSelectedMode('basic');
     setEventName('');
     setEventDescription('');
-    setEventTriggerType('messageCreate');
-  };
-
-  const handleSelectEventType = (eventType) => {
-    if (!eventType.available) {
-      return;
-    }
-    setSelectedEventType(eventType.type);
-    setShowEventTypeSelector(false);
-    setShowModeSelector(true); // Show mode selector next
+    setShowSettings(false);
   };
 
   const handleSelectMode = (mode) => {
@@ -107,11 +68,7 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
 
   const handleConfigComplete = () => {
     // Validate name
-    if (selectedEventType === 'command' && !eventName.trim()) {
-      alert('Please enter a command name');
-      return;
-    }
-    if (selectedEventType === 'event' && !eventName.trim()) {
+    if (!eventName.trim()) {
       alert('Please enter an event name');
       return;
     }
@@ -123,11 +80,17 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
   const handleEdit = (index) => {
     const event = events[index];
     setEditingIndex(index);
-    setSelectedEventType(event.type);
     setEventName(event.name || '');
     setEventDescription(event.description || '');
-    setEventTriggerType(event.triggerType || 'messageCreate');
     setShowFlowEditor(true);
+  };
+
+  const handleUpdateSettings = () => {
+    if (!eventName.trim()) {
+      alert('Please enter an event name');
+      return;
+    }
+    setShowSettings(false);
   };
 
   // Event configuration screen
@@ -143,13 +106,13 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
         <div style={{ padding: '24px', maxWidth: '600px', margin: '0 auto' }}>
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#fff' }}>
-              {selectedEventType === 'command' ? 'Command Name' : 'Event Name'}
+              Event Name
             </label>
             <input
               type="text"
               value={eventName}
-              onChange={(e) => setEventName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
-              placeholder={selectedEventType === 'command' ? 'hello' : 'My Custom Event'}
+              onChange={(e) => setEventName(e.target.value)}
+              placeholder="My Custom Event"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -160,11 +123,6 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
                 color: '#fff',
               }}
             />
-            {selectedEventType === 'command' && (
-              <p style={{ marginTop: '8px', fontSize: '12px', color: '#888' }}>
-                Command will be: /{eventName || 'yourcommand'}
-              </p>
-            )}
           </div>
 
           <div style={{ marginBottom: '20px' }}>
@@ -188,34 +146,6 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
               }}
             />
           </div>
-
-          {selectedEventType === 'event' && (
-            <div style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#fff' }}>
-                Trigger Type
-              </label>
-              <select
-                value={eventTriggerType}
-                onChange={(e) => setEventTriggerType(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '14px',
-                  border: '2px solid #444',
-                  borderRadius: '8px',
-                  background: '#2b2b2b',
-                  color: '#fff',
-                }}
-              >
-                <option value="messageCreate">Message Created</option>
-                <option value="messageDelete">Message Deleted</option>
-                <option value="guildMemberAdd">Member Joined</option>
-                <option value="guildMemberRemove">Member Left</option>
-                <option value="messageReactionAdd">Reaction Added</option>
-                <option value="voiceStateUpdate">Voice State Changed</option>
-              </select>
-            </div>
-          )}
 
           <button
             onClick={handleConfigComplete}
@@ -266,46 +196,19 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
     );
   }
 
-  // Event type selector screen
-  if (showEventTypeSelector) {
-    return (
-      <div className="event-type-selector">
-        <div className="selector-header">
-          <h2>Choose Event Type</h2>
-          <button onClick={handleClose} className="secondary">
-            Cancel
-          </button>
-        </div>
-        <div className="event-types-grid">
-          {EVENT_TYPES.map((eventType) => (
-            <div
-              key={eventType.type}
-              className={`event-type-card ${!eventType.available ? 'disabled' : ''}`}
-              onClick={() => handleSelectEventType(eventType)}
-            >
-              <div className="event-type-icon">{eventType.icon}</div>
-              <h3>{eventType.label}</h3>
-              <p>{eventType.description}</p>
-              {!eventType.available && <div className="coming-soon-badge">Coming Soon</div>}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="event-builder">
       {showFlowEditor && (
         <BlueprintCanvas
           initialNodes={editingIndex !== null ? events[editingIndex]?.flowData?.nodes || [] : []}
           initialEdges={editingIndex !== null ? events[editingIndex]?.flowData?.edges || [] : []}
+          eventName={eventName}
+          eventDescription={eventDescription}
+          onOpenSettings={() => setShowSettings(true)}
           onSave={(flowData) => {
             const event = editingIndex !== null ? events[editingIndex] : {
-              type: selectedEventType,
               name: eventName,
               description: eventDescription,
-              triggerType: selectedEventType === 'event' ? eventTriggerType : undefined,
               flowData: { nodes: [], edges: [] }
             };
             handleSave({ ...event, flowData });
@@ -314,12 +217,114 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
         />
       )}
 
+      {showSettings && showFlowEditor && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{
+            background: '#2b2b2b',
+            borderRadius: '12px',
+            padding: '24px',
+            maxWidth: '500px',
+            width: '90%',
+          }}>
+            <h2 style={{ color: '#fff', marginBottom: '20px' }}>Event Settings</h2>
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#fff' }}>
+                Event Name
+              </label>
+              <input
+                type="text"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                placeholder="My Custom Event"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '14px',
+                  border: '2px solid #444',
+                  borderRadius: '8px',
+                  background: '#1a1a1a',
+                  color: '#fff',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#fff' }}>
+                Description
+              </label>
+              <textarea
+                value={eventDescription}
+                onChange={(e) => setEventDescription(e.target.value)}
+                placeholder="What does this event do?"
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '14px',
+                  border: '2px solid #444',
+                  borderRadius: '8px',
+                  background: '#1a1a1a',
+                  color: '#fff',
+                  resize: 'vertical',
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={handleUpdateSettings}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  background: '#3498db',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  background: '#555',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="builder-header">
         <div>
           <h2>Event Builder</h2>
           <p>Create and manage your bot's events using the visual graph editor</p>
         </div>
-        <button onClick={() => setShowEventTypeSelector(true)} className="primary">
+        <button onClick={() => setShowModeSelector(true)} className="primary">
           + New Event
         </button>
       </div>
@@ -329,14 +334,13 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
           <div className="empty-icon">📝</div>
           <h3>No Events Yet</h3>
           <p>Create your first event to get started!</p>
-          <button onClick={() => setShowEventTypeSelector(true)} className="primary">
+          <button onClick={() => setShowModeSelector(true)} className="primary">
             Create First Event
           </button>
         </div>
       ) : (
         <div className="events-grid">
           {events.map((event, index) => {
-            const eventTypeDef = EVENT_TYPES.find((et) => et.type === event.type);
             const nodeCount = event.flowData?.nodes?.length || 0;
             const connectionCount = event.flowData?.edges?.length || 0;
 
@@ -344,8 +348,8 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
               <div key={index} className="event-card">
                 <div className="event-card-header">
                   <div className="event-type-badge">
-                    <span className="event-icon">{eventTypeDef?.icon}</span>
-                    <span className="event-type-label">{eventTypeDef?.label}</span>
+                    <span className="event-icon">🎯</span>
+                    <span className="event-type-label">Custom Event</span>
                   </div>
                   <div className="event-actions">
                     <button onClick={() => handleEdit(index)} className="secondary" title="Edit event">
@@ -357,9 +361,7 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
                   </div>
                 </div>
                 <div className="event-card-body">
-                  {event.type === 'command' && <div className="event-name">/{event.name}</div>}
-                  {event.type === 'event' && <div className="event-name">{event.triggerType || 'Event'}</div>}
-                  {event.type === 'anti-hack' && <div className="event-name">🛡️ {event.triggerType || 'Anti-Hack'}</div>}
+                  <div className="event-name">{event.name}</div>
                   <p className="event-description">{event.description || 'No description'}</p>
                   <div className="event-stats">
                     <span className="stat">
