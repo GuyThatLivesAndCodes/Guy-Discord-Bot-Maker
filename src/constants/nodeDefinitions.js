@@ -115,6 +115,24 @@ export const ActionNodes = {
     dataOutputs: [],
   },
 
+  REPLY_TO_MESSAGE: {
+    id: 'action-reply-message',
+    category: NodeCategory.ACTION,
+    label: 'Reply to Message',
+    description: 'Reply directly to a message',
+    icon: '↩️',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [
+      { id: 'message', label: 'Message', type: PinTypes.MESSAGE, optional: false },
+      { id: 'content', label: 'Content', type: PinTypes.STRING, optional: true },
+      { id: 'embed', label: 'Embed', type: PinTypes.EMBED, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'reply', label: 'Reply', type: PinTypes.MESSAGE },
+    ],
+  },
+
   REPLY_TO_INTERACTION: {
     id: 'action-reply-interaction',
     category: NodeCategory.ACTION,

@@ -525,6 +525,8 @@ class BotRunner {
   }
 
   setupEventHandlers() {
+    const { isBlueprintEvent, executeBlueprintEvent, findEventNode } = require('./blueprintExecutor');
+
     this.client.once('ready', () => {
       this.log('success', `Bot is online as ${this.client.user.tag}`);
       this.log('info', `Serving ${this.client.guilds.cache.size} servers`);
@@ -553,14 +555,26 @@ class BotRunner {
       }
     });
 
-    // Register Discord event triggers
-    const eventTriggers = (this.config.events || []).filter(event => event.type === 'event');
-    eventTriggers.forEach(eventTrigger => {
+    // Register all events (blueprint and legacy)
+    const allEvents = this.config.events || [];
+
+    // Separate blueprint events from legacy events
+    const blueprintEvents = allEvents.filter(event => isBlueprintEvent(event));
+    const legacyEvents = allEvents.filter(event => !isBlueprintEvent(event));
+
+    // Register blueprint events
+    blueprintEvents.forEach(event => {
+      this.registerBlueprintEvent(event);
+    });
+
+    // Register legacy event triggers
+    const legacyEventTriggers = legacyEvents.filter(event => event.type === 'event');
+    legacyEventTriggers.forEach(eventTrigger => {
       this.registerEventTrigger(eventTrigger);
     });
 
     // Register Anti-Hack triggers
-    const antiHackTriggers = (this.config.events || []).filter(event => event.type === 'anti-hack');
+    const antiHackTriggers = legacyEvents.filter(event => event.type === 'anti-hack');
     if (antiHackTriggers.length > 0) {
       this.registerAntiHackTriggers(antiHackTriggers);
     }
@@ -571,6 +585,128 @@ class BotRunner {
 
     this.client.on('disconnect', () => {
       this.log('info', 'Bot disconnected');
+    });
+  }
+
+  registerBlueprintEvent(event) {
+    const { executeBlueprintEvent, findEventNode } = require('./blueprintExecutor');
+
+    if (!event.flowData || !event.flowData.nodes) {
+      this.log('warning', `Blueprint event "${event.name}" has no nodes`);
+      return;
+    }
+
+    // Find which event nodes are in this blueprint
+    const eventNodes = event.flowData.nodes.filter(node =>
+      node.type === 'blueprintNode' &&
+      node.data?.definitionId &&
+      (node.data.definitionId.startsWith('ON_') || node.data.definitionId.includes('EVENT'))
+    );
+
+    if (eventNodes.length === 0) {
+      this.log('warning', `Blueprint event "${event.name}" has no event trigger nodes`);
+      return;
+    }
+
+    // Register handlers for each event type found
+    eventNodes.forEach(eventNode => {
+      const eventType = eventNode.data.definitionId;
+
+      switch (eventType) {
+        case 'ON_MESSAGE_CREATED':
+          this.client.on('messageCreate', async (message) => {
+            if (message.author.bot) return; // Ignore bot messages
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageCreate`);
+              await executeBlueprintEvent('messageCreate', { message }, event.flowData, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ON_MESSAGE_CREATED`);
+          break;
+
+        case 'ON_MESSAGE_DELETED':
+          this.client.on('messageDelete', async (message) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageDelete`);
+              await executeBlueprintEvent('messageDelete', { message }, event.flowData, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ON_MESSAGE_DELETED`);
+          break;
+
+        case 'ON_MEMBER_JOINED':
+          this.client.on('guildMemberAdd', async (member) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for guildMemberAdd`);
+              await executeBlueprintEvent('guildMemberAdd', { member }, event.flowData, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ON_MEMBER_JOINED`);
+          break;
+
+        case 'ON_MEMBER_LEFT':
+          this.client.on('guildMemberRemove', async (member) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for guildMemberRemove`);
+              await executeBlueprintEvent('guildMemberRemove', { member }, event.flowData, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ON_MEMBER_LEFT`);
+          break;
+
+        case 'ON_REACTION_ADDED':
+          this.client.on('messageReactionAdd', async (reaction, user) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageReactionAdd`);
+              await executeBlueprintEvent('messageReactionAdd', { reaction, user }, event.flowData, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ON_REACTION_ADDED`);
+          break;
+
+        case 'ON_VOICE_STATE_CHANGED':
+          this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for voiceStateUpdate`);
+              await executeBlueprintEvent('voiceStateUpdate', { oldState, newState }, event.flowData, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ON_VOICE_STATE_CHANGED`);
+          break;
+
+        case 'ON_SLASH_COMMAND':
+          // Slash commands are handled separately via command registration
+          // This event node is just for the flow, not for triggering
+          break;
+
+        case 'ON_BOT_READY':
+          // Bot ready events are one-time, handled differently
+          this.client.once('ready', async (client) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for ready`);
+              await executeBlueprintEvent('ready', { client }, event.flowData, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ON_BOT_READY`);
+          break;
+
+        default:
+          this.log('warning', `Unknown blueprint event type: ${eventType}`);
+      }
     });
   }
 
@@ -971,7 +1107,21 @@ class BotRunner {
   }
 
   async executeCommand(interaction, command) {
-    // Execute graph-based command flow with data flow support
+    const { isBlueprintEvent, executeBlueprintCommand } = require('./blueprintExecutor');
+
+    // Check if this is a blueprint command
+    if (isBlueprintEvent(command)) {
+      try {
+        this.log('info', `Executing blueprint command: ${command.name}`);
+        await executeBlueprintCommand(interaction, command.flowData, this);
+        return;
+      } catch (error) {
+        this.log('error', `Blueprint command error: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // Legacy flow execution below
     const flowData = command.flowData;
 
     if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
