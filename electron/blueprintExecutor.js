@@ -13,6 +13,8 @@ async function executeBlueprintFlow(eventNode, flowData, context, client) {
   // Import execution engine (CommonJS version)
   const { executeEventFlow } = require('./executionEngine.cjs');
 
+  client.log('info', `[BP] executeBlueprintFlow: node=${eventNode.id}`);
+
   // Add Discord client to context
   const fullContext = {
     ...context,
@@ -21,10 +23,13 @@ async function executeBlueprintFlow(eventNode, flowData, context, client) {
 
   // Execute the flow
   try {
+    client.log('info', '[BP] Calling executeEventFlow in execution engine...');
     const result = await executeEventFlow(eventNode, flowData, fullContext);
+    client.log('info', '[BP] executeEventFlow returned successfully');
     return result;
   } catch (error) {
-    console.error('[Blueprint] Error executing flow:', error);
+    client.log('error', `[BP] Error in executeEventFlow: ${error.message}`);
+    console.error('[Blueprint] Full error:', error);
     throw error;
   }
 }
@@ -273,65 +278,48 @@ async function executeBlueprintCommand(interaction, command, client) {
  * Execute a blueprint Discord event (message, member join, etc.)
  */
 async function executeBlueprintEvent(eventType, eventData, eventConfig, client) {
-  console.log('[Blueprint] executeBlueprintEvent called with:', {
-    eventType,
-    hasEventData: !!eventData,
-    hasEventConfig: !!eventConfig,
-    hasClient: !!client,
-    eventConfigType: typeof eventConfig,
-  });
+  // Use client.log to show in UI logs
+  client.log('info', `[BP] executeBlueprintEvent called: ${eventType}`);
 
   const flowData = eventConfig.flowData;
 
-  console.log('[Blueprint] FlowData check:', {
-    hasFlowData: !!flowData,
-    hasNodes: !!(flowData && flowData.nodes),
-    nodeCount: flowData && flowData.nodes ? flowData.nodes.length : 0,
-    edgeCount: flowData && flowData.edges ? flowData.edges.length : 0,
-  });
+  const nodeCount = flowData?.nodes?.length || 0;
+  const edgeCount = flowData?.edges?.length || 0;
+  client.log('info', `[BP] FlowData: hasData=${!!flowData}, nodes=${nodeCount}, edges=${edgeCount}`);
 
   if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
-    console.warn('[Blueprint] No flowData or nodes found');
+    client.log('error', '[BP] No flowData or nodes found!');
     return;
   }
 
   // Find the appropriate event node
   const eventNode = findEventNode(flowData, eventType);
 
-  console.log('[Blueprint] Event node search:', {
-    eventType,
-    foundNode: !!eventNode,
-    nodeId: eventNode ? eventNode.id : null,
-    nodeDefId: eventNode ? eventNode.data?.definitionId : null,
-  });
-
   if (!eventNode) {
-    console.warn(`[Blueprint] No event node found for ${eventType}`);
-    console.log('[Blueprint] Available nodes:', flowData.nodes.map(n => ({
-      id: n.id,
-      type: n.type,
-      defId: n.data?.definitionId,
-    })));
+    client.log('error', `[BP] No event node found for ${eventType}`);
+    const nodeList = flowData.nodes.map(n => n.data?.definitionId || 'unknown').join(', ');
+    client.log('info', `[BP] Available nodes: ${nodeList}`);
     return;
   }
+
+  client.log('info', `[BP] Event node found: ${eventNode.data?.definitionId}`);
 
   // Create context
   const context = createEventContext(eventType, eventData);
 
-  console.log('[Blueprint] Context created:', {
-    contextKeys: Object.keys(context),
-    hasMessage: !!context.message,
-    hasChannel: !!context.channel,
-  });
+  const contextKeys = Object.keys(context).join(', ');
+  client.log('info', `[BP] Context keys: ${contextKeys}`);
+  client.log('info', `[BP] Has message: ${!!context.message}, has channel: ${!!context.channel}`);
 
   // Execute the flow
   try {
-    console.log('[Blueprint] Starting flow execution...');
+    client.log('info', '[BP] Starting flow execution...');
     await executeBlueprintFlow(eventNode, flowData, context, client);
-    console.log('[Blueprint] Flow execution completed successfully');
+    client.log('success', '[BP] Flow execution completed!');
   } catch (error) {
-    console.error(`[Blueprint] Error executing event ${eventType}:`, error);
-    console.error('[Blueprint] Error stack:', error.stack);
+    client.log('error', `[BP] Execution error: ${error.message}`);
+    console.error('[Blueprint] Full error:', error);
+    console.error('[Blueprint] Stack:', error.stack);
   }
 }
 

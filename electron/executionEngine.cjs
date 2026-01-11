@@ -50,13 +50,12 @@ function getNodeCategory(definitionId) {
  * Execute a complete event flow starting from an event node
  */
 async function executeEventFlow(eventNode, flowData, context) {
-  console.log('[ExecutionEngine] executeEventFlow called');
-  console.log('[ExecutionEngine] Event node:', {
-    id: eventNode.id,
-    type: eventNode.type,
-    defId: eventNode.data?.definitionId,
-    hasExecOutputs: !!(eventNode.data.execOutputs && eventNode.data.execOutputs.length > 0),
-  });
+  const log = context.client && context.client.log ? context.client.log.bind(context.client) : null;
+
+  if (log) {
+    log('info', `[EE] executeEventFlow called`);
+    log('info', `[EE] Node: id=${eventNode.id}, type=${eventNode.type}, def=${eventNode.data?.definitionId}`);
+  }
 
   // Initialize execution context
   const executionContext = {
@@ -65,12 +64,16 @@ async function executeEventFlow(eventNode, flowData, context) {
     visited: new Set(), // Visited nodes to prevent cycles
   };
 
-  console.log('[ExecutionEngine] Context keys:', Object.keys(context));
+  if (log) {
+    log('info', `[EE] Context has ${Object.keys(context).length} keys`);
+  }
 
   // Start execution from the event node's exec output
   if (eventNode.data.execOutputs && eventNode.data.execOutputs.length > 0) {
     const firstExecOut = eventNode.data.execOutputs[0];
-    console.log('[ExecutionEngine] Starting execution from pin:', `exec-out-${firstExecOut.id}`);
+    if (log) {
+      log('info', `[EE] Starting from exec pin: exec-out-${firstExecOut.id}`);
+    }
     await executeFromPin(
       eventNode.id,
       `exec-out-${firstExecOut.id}`,
@@ -78,6 +81,9 @@ async function executeEventFlow(eventNode, flowData, context) {
       executionContext
     );
   } else {
+    if (log) {
+      log('error', '[EE] Event node has NO exec outputs!');
+    }
     console.warn('[ExecutionEngine] Event node has no exec outputs!');
   }
 
@@ -88,40 +94,45 @@ async function executeEventFlow(eventNode, flowData, context) {
  * Execute flow starting from a specific output pin
  */
 async function executeFromPin(nodeId, sourceHandle, flowData, context) {
-  console.log('[ExecutionEngine] executeFromPin:', { nodeId, sourceHandle });
+  const log = context.client && context.client.log ? context.client.log.bind(context.client) : null;
+
+  if (log) {
+    log('info', `[EE] executeFromPin: ${sourceHandle} on node ${nodeId}`);
+  }
 
   // Find all edges connected to this output
   const connectedEdges = flowData.edges.filter(
     (edge) => edge.source === nodeId && edge.sourceHandle === sourceHandle
   );
 
-  console.log('[ExecutionEngine] Found connected edges:', connectedEdges.length);
+  if (log) {
+    log('info', `[EE] Found ${connectedEdges.length} connected edges`);
+  }
 
   // Execute all connected nodes
   for (const edge of connectedEdges) {
-    console.log('[ExecutionEngine] Processing edge:', {
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edge.sourceHandle,
-      targetHandle: edge.targetHandle,
-    });
+    if (log) {
+      log('info', `[EE] Processing edge: ${edge.source} -> ${edge.target}`);
+    }
 
     const targetNode = flowData.nodes.find((n) => n.id === edge.target);
     if (!targetNode) {
-      console.warn('[ExecutionEngine] Target node not found:', edge.target);
+      if (log) {
+        log('error', `[EE] Target node not found: ${edge.target}`);
+      }
       continue;
     }
 
-    console.log('[ExecutionEngine] Target node found:', {
-      id: targetNode.id,
-      type: targetNode.type,
-      defId: targetNode.data?.definitionId,
-    });
+    if (log) {
+      log('info', `[EE] Target node: ${targetNode.data?.definitionId}`);
+    }
 
     // Prevent infinite loops
     const visitKey = `${targetNode.id}-${edge.targetHandle}`;
     if (context.visited.has(visitKey)) {
-      console.warn('[ExecutionEngine] Cycle detected, skipping node:', targetNode.id);
+      if (log) {
+        log('error', `[EE] Cycle detected, skipping: ${targetNode.id}`);
+      }
       continue;
     }
     context.visited.add(visitKey);
@@ -134,51 +145,57 @@ async function executeFromPin(nodeId, sourceHandle, flowData, context) {
  * Execute a single node
  */
 async function executeNode(node, entryHandle, flowData, context) {
-  console.log('[ExecutionEngine] executeNode:', {
-    nodeId: node.id,
-    type: node.type,
-    defId: node.data?.definitionId,
-  });
+  const log = context.client && context.client.log ? context.client.log.bind(context.client) : null;
+
+  if (log) {
+    log('info', `[EE] executeNode: ${node.data?.definitionId}`);
+  }
 
   const definitionId = node.data?.definitionId;
   if (!definitionId) {
-    console.error('[ExecutionEngine] Node missing definitionId:', node.id);
+    if (log) {
+      log('error', `[EE] Node missing definitionId: ${node.id}`);
+    }
     return;
   }
 
   const category = getNodeCategory(definitionId);
-  console.log('[ExecutionEngine] Node category:', category);
+  if (log) {
+    log('info', `[EE] Node category: ${category}`);
+  }
 
   try {
     switch (category) {
       case 'event':
-        console.log('[ExecutionEngine] Executing event node');
+        if (log) log('info', '[EE] Executing event node');
         // Event nodes just provide data, continue execution
         await continueExecution(node, 'exec', flowData, context);
         break;
 
       case 'action':
-        console.log('[ExecutionEngine] Executing action node:', definitionId);
+        if (log) log('info', `[EE] Executing ACTION: ${definitionId}`);
         await executeActionNode(node, definitionId, flowData, context);
         break;
 
       case 'pure':
-        console.log('[ExecutionEngine] Executing pure node (lazy)');
+        if (log) log('info', '[EE] Executing pure node (lazy)');
         // Pure nodes are executed on-demand via evaluateDataPin
         evaluateDataPin(node, node.data.dataOutputs?.[0]?.id, flowData, context);
         break;
 
       case 'flow':
-        console.log('[ExecutionEngine] Executing flow control node');
+        if (log) log('info', '[EE] Executing flow control node');
         await executeFlowNode(node, definitionId, flowData, context);
         break;
 
       default:
-        console.warn('[ExecutionEngine] Unknown node category:', category, 'for', definitionId);
+        if (log) log('error', `[EE] Unknown category: ${category} for ${definitionId}`);
     }
   } catch (error) {
-    console.error(`[ExecutionEngine] Error executing node ${node.id}:`, error);
-    console.error('[ExecutionEngine] Error stack:', error.stack);
+    if (log) {
+      log('error', `[EE] Error in node ${node.id}: ${error.message}`);
+    }
+    console.error(`[ExecutionEngine] Error stack:`, error.stack);
     throw error;
   }
 }
@@ -187,13 +204,19 @@ async function executeNode(node, entryHandle, flowData, context) {
  * Execute an action node
  */
 async function executeActionNode(node, definitionId, flowData, context) {
-  console.log('[ExecutionEngine] executeActionNode:', definitionId);
+  const log = context.client && context.client.log ? context.client.log.bind(context.client) : null;
+
+  if (log) {
+    log('info', `[EE] executeActionNode: ${definitionId}`);
+  }
 
   // Gather all input values
   const inputs = {};
   const dataInputs = node.data.dataInputs || [];
 
-  console.log('[ExecutionEngine] Data inputs:', dataInputs.map(d => d.id));
+  if (log) {
+    log('info', `[EE] Gathering ${dataInputs.length} inputs: ${dataInputs.map(d => d.id).join(', ')}`);
+  }
 
   for (const dataInput of dataInputs) {
     const value = await evaluateDataPin(
@@ -203,22 +226,29 @@ async function executeActionNode(node, definitionId, flowData, context) {
       context
     );
 
-    console.log('[ExecutionEngine] Input value for', dataInput.id, ':', value);
+    if (log) {
+      const valStr = value ? `${typeof value}` : 'undefined';
+      log('info', `[EE] Input '${dataInput.id}': ${valStr}`);
+    }
 
     if (value === undefined && !dataInput.optional) {
-      console.warn(`[ExecutionEngine] Missing required input ${dataInput.id} for node ${node.id}`);
+      if (log) {
+        log('error', `[EE] Missing required input: ${dataInput.id}`);
+      }
     }
 
     inputs[dataInput.id] = value;
   }
 
-  console.log('[ExecutionEngine] All inputs:', inputs);
-
   // Execute the action
-  console.log('[ExecutionEngine] Calling executeAction for:', definitionId);
+  if (log) {
+    log('info', `[EE] Calling executeAction...`);
+  }
   const outputs = await executeAction(definitionId, inputs, context);
 
-  console.log('[ExecutionEngine] Action outputs:', outputs);
+  if (log) {
+    log('info', `[EE] Action completed, outputs: ${outputs ? 'yes' : 'none'}`);
+  }
 
   // Store outputs in context
   if (outputs) {
@@ -226,7 +256,9 @@ async function executeActionNode(node, definitionId, flowData, context) {
   }
 
   // Continue execution through exec output
-  console.log('[ExecutionEngine] Continuing execution after action');
+  if (log) {
+    log('info', '[EE] Continuing to next node...');
+  }
   await continueExecution(node, 'exec', flowData, context);
 }
 
