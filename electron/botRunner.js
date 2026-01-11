@@ -116,6 +116,9 @@ class BotRunner {
     this.processes = new Map(); // Store running processes by ID
     this.sshConnections = new Map(); // Store SSH connections by config hash
 
+    // Anti-hack tracking
+    this.userActivity = new Map(); // Track user activity for anti-hack detection
+
     // Initialize storage directories
     this.storagePath = path.join(process.cwd(), 'bot-storage', this.botId);
     this.filesPath = path.join(this.storagePath, 'files');
@@ -508,6 +511,12 @@ class BotRunner {
       this.registerEventTrigger(eventTrigger);
     });
 
+    // Register Anti-Hack triggers
+    const antiHackTriggers = (this.config.events || []).filter(event => event.type === 'anti-hack');
+    if (antiHackTriggers.length > 0) {
+      this.registerAntiHackTriggers(antiHackTriggers);
+    }
+
     this.client.on('error', (error) => {
       this.log('error', `Client error: ${error.message}`);
     });
@@ -593,6 +602,222 @@ class BotRunner {
     }
   }
 
+  registerAntiHackTriggers(antiHackTriggers) {
+    const TIME_WINDOW = 10000; // 10 seconds for rate limiting
+    const MAX_MESSAGES = 5; // Max messages in time window
+    const MAX_EDITS = 3; // Max edits in time window
+    const MAX_DELETES = 3; // Max deletes in time window
+    const MAX_LINKS = 3; // Max links in single message or time window
+    const MAX_ATTACHMENTS = 3; // Max attachments in time window
+    const MAX_MENTIONS = 5; // Max mentions in single message
+    const MAX_EMOJIS = 10; // Max emojis in single message
+
+    // Message create handler for spam detection
+    this.client.on('messageCreate', async (message) => {
+      if (message.author.bot) return;
+
+      const userId = message.author.id;
+      const now = Date.now();
+
+      // Initialize user activity tracking
+      if (!this.userActivity.has(userId)) {
+        this.userActivity.set(userId, {
+          messages: [],
+          edits: [],
+          deletes: [],
+          attachments: [],
+          lastMessages: [], // For duplicate detection
+        });
+      }
+
+      const activity = this.userActivity.get(userId);
+
+      // Clean old activity (older than TIME_WINDOW)
+      activity.messages = activity.messages.filter(t => now - t < TIME_WINDOW);
+      activity.edits = activity.edits.filter(t => now - t < TIME_WINDOW);
+      activity.deletes = activity.deletes.filter(t => now - t < TIME_WINDOW);
+      activity.attachments = activity.attachments.filter(t => now - t < TIME_WINDOW);
+
+      // Track message
+      activity.messages.push(now);
+
+      // Message Spam Detection
+      if (activity.messages.length > MAX_MESSAGES) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'messageSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Message spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'messageSpam',
+            user: message.author,
+            channel: message.channel,
+            guild: message.guild,
+            messageCount: activity.messages.length
+          });
+        }
+      }
+
+      // Link Spam Detection
+      const urlRegex = /(https?:\/\/[^\s]+)/g;
+      const links = message.content.match(urlRegex) || [];
+      if (links.length > MAX_LINKS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'linkSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Link spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'linkSpam',
+            user: message.author,
+            channel: message.channel,
+            linkCount: links.length
+          });
+        }
+      }
+
+      // Attachment Spam Detection
+      if (message.attachments.size > 0) {
+        activity.attachments.push(now);
+        if (activity.attachments.length > MAX_ATTACHMENTS) {
+          const trigger = antiHackTriggers.find(t => t.triggerType === 'attachmentSpam');
+          if (trigger) {
+            this.log('warning', `[Anti-Hack] Attachment spam detected from ${message.author.tag}`);
+            await this.executeEventFlow(trigger, {
+              type: 'attachmentSpam',
+              user: message.author,
+              channel: message.channel,
+              attachmentCount: activity.attachments.length
+            });
+          }
+        }
+      }
+
+      // Mention Spam Detection
+      const mentions = message.mentions.users.size + message.mentions.roles.size;
+      if (mentions > MAX_MENTIONS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'mentionSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Mention spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'mentionSpam',
+            user: message.author,
+            channel: message.channel,
+            mentionCount: mentions
+          });
+        }
+      }
+
+      // Emoji Spam Detection
+      const emojiRegex = /<a?:[a-zA-Z0-9_]+:[0-9]+>|[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA70}-\u{1FAFF}]/gu;
+      const emojis = message.content.match(emojiRegex) || [];
+      if (emojis.length > MAX_EMOJIS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'emojiSpam');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Emoji spam detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'emojiSpam',
+            user: message.author,
+            channel: message.channel,
+            emojiCount: emojis.length
+          });
+        }
+      }
+
+      // Duplicate Messages Detection
+      const messageContent = message.content.toLowerCase().trim();
+      if (messageContent.length > 0) {
+        activity.lastMessages = activity.lastMessages || [];
+        activity.lastMessages.push({ content: messageContent, time: now });
+        activity.lastMessages = activity.lastMessages.filter(m => now - m.time < TIME_WINDOW);
+
+        const duplicates = activity.lastMessages.filter(m => m.content === messageContent).length;
+        if (duplicates >= 3) { // Same message 3+ times
+          const trigger = antiHackTriggers.find(t => t.triggerType === 'duplicateMessages');
+          if (trigger) {
+            this.log('warning', `[Anti-Hack] Duplicate messages detected from ${message.author.tag}`);
+            await this.executeEventFlow(trigger, {
+              type: 'duplicateMessages',
+              user: message.author,
+              channel: message.channel,
+              duplicateCount: duplicates
+            });
+          }
+        }
+      }
+    });
+
+    // Message update handler for suspicious edit detection
+    this.client.on('messageUpdate', async (oldMessage, newMessage) => {
+      if (newMessage.author?.bot) return;
+
+      const userId = newMessage.author.id;
+      const now = Date.now();
+
+      if (!this.userActivity.has(userId)) {
+        this.userActivity.set(userId, {
+          messages: [],
+          edits: [],
+          deletes: [],
+          attachments: [],
+          lastMessages: [],
+        });
+      }
+
+      const activity = this.userActivity.get(userId);
+      activity.edits = activity.edits.filter(t => now - t < TIME_WINDOW);
+      activity.edits.push(now);
+
+      // Suspicious Edit Detection
+      if (activity.edits.length > MAX_EDITS) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'suspiciousEdit');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Suspicious edits detected from ${newMessage.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'suspiciousEdit',
+            user: newMessage.author,
+            channel: newMessage.channel,
+            editCount: activity.edits.length
+          });
+        }
+      }
+    });
+
+    // Message delete handler for mass delete detection
+    this.client.on('messageDelete', async (message) => {
+      if (message.author?.bot) return;
+
+      const userId = message.author.id;
+      const now = Date.now();
+
+      if (!this.userActivity.has(userId)) {
+        this.userActivity.set(userId, {
+          messages: [],
+          edits: [],
+          deletes: [],
+          attachments: [],
+          lastMessages: [],
+        });
+      }
+
+      const activity = this.userActivity.get(userId);
+      activity.deletes = activity.deletes.filter(t => now - t < TIME_WINDOW);
+      activity.deletes.push(now);
+
+      // Mass Delete Detection
+      if (activity.deletes.length > MAX_DELETES) {
+        const trigger = antiHackTriggers.find(t => t.triggerType === 'massDelete');
+        if (trigger) {
+          this.log('warning', `[Anti-Hack] Mass delete detected from ${message.author.tag}`);
+          await this.executeEventFlow(trigger, {
+            type: 'massDelete',
+            user: message.author,
+            channel: message.channel,
+            deleteCount: activity.deletes.length
+          });
+        }
+      }
+    });
+
+    this.log('info', `Registered ${antiHackTriggers.length} anti-hack triggers`);
+  }
+
   async executeEventFlow(eventTrigger, eventData) {
     const flowData = eventTrigger.flowData;
 
@@ -633,6 +858,56 @@ class BotRunner {
       case 'voiceStateUpdate':
         dataContext.user = eventData.newState.member?.user;
         dataContext.guild = eventData.newState.guild;
+        break;
+
+      // Anti-Hack triggers
+      case 'messageSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.guild = eventData.guild;
+        dataContext.messageCount = eventData.messageCount;
+        break;
+
+      case 'suspiciousEdit':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.editCount = eventData.editCount;
+        break;
+
+      case 'massDelete':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.deleteCount = eventData.deleteCount;
+        break;
+
+      case 'linkSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.linkCount = eventData.linkCount;
+        break;
+
+      case 'attachmentSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.attachmentCount = eventData.attachmentCount;
+        break;
+
+      case 'mentionSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.mentionCount = eventData.mentionCount;
+        break;
+
+      case 'emojiSpam':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.emojiCount = eventData.emojiCount;
+        break;
+
+      case 'duplicateMessages':
+        dataContext.user = eventData.user;
+        dataContext.channel = eventData.channel;
+        dataContext.duplicateCount = eventData.duplicateCount;
         break;
     }
 

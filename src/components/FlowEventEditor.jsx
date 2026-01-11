@@ -99,6 +99,104 @@ const TRIGGER_TYPES = {
       { id: 'guild', type: 'GUILD', label: 'Guild' },
     ],
   },
+  // Anti-Hack triggers
+  messageSpam: {
+    type: 'antihack-message-spam',
+    label: 'Message Spam Detected',
+    icon: '⚡',
+    color: '#ed4245',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'Spammer' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'guild', type: 'GUILD', label: 'Guild' },
+      { id: 'messageCount', type: 'NUMBER', label: 'Message Count' },
+    ],
+  },
+  suspiciousEdit: {
+    type: 'antihack-suspicious-edit',
+    label: 'Suspicious Edit Detected',
+    icon: '✏️',
+    color: '#f39c12',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'editCount', type: 'NUMBER', label: 'Edit Count' },
+    ],
+  },
+  massDelete: {
+    type: 'antihack-mass-delete',
+    label: 'Mass Delete Detected',
+    icon: '🗑️',
+    color: '#e74c3c',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'deleteCount', type: 'NUMBER', label: 'Delete Count' },
+    ],
+  },
+  linkSpam: {
+    type: 'antihack-link-spam',
+    label: 'Link Spam Detected',
+    icon: '🔗',
+    color: '#3498db',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'linkCount', type: 'NUMBER', label: 'Link Count' },
+    ],
+  },
+  attachmentSpam: {
+    type: 'antihack-attachment-spam',
+    label: 'Attachment Spam Detected',
+    icon: '📎',
+    color: '#9b59b6',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'attachmentCount', type: 'NUMBER', label: 'Attachment Count' },
+    ],
+  },
+  mentionSpam: {
+    type: 'antihack-mention-spam',
+    label: 'Mention Spam Detected',
+    icon: '@',
+    color: '#e67e22',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'mentionCount', type: 'NUMBER', label: 'Mention Count' },
+    ],
+  },
+  emojiSpam: {
+    type: 'antihack-emoji-spam',
+    label: 'Emoji Spam Detected',
+    icon: '😂',
+    color: '#faa61a',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'emojiCount', type: 'NUMBER', label: 'Emoji Count' },
+    ],
+  },
+  duplicateMessages: {
+    type: 'antihack-duplicate-messages',
+    label: 'Duplicate Messages Detected',
+    icon: '📋',
+    color: '#95a5a6',
+    outputs: [
+      { id: 'flow', type: 'FLOW', label: 'Flow' },
+      { id: 'user', type: 'USER', label: 'User' },
+      { id: 'channel', type: 'CHANNEL', label: 'Channel' },
+      { id: 'duplicateCount', type: 'NUMBER', label: 'Duplicate Count' },
+    ],
+  },
 };
 
 // Data converter nodes
@@ -1215,12 +1313,12 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
       type: eventType || 'command',
       name: '',
       description: '',
-      triggerType: eventType === 'event' ? 'messageCreate' : undefined,
+      triggerType: eventType === 'event' ? 'messageCreate' : (eventType === 'anti-hack' ? 'messageSpam' : undefined),
       flowData: { nodes: [], edges: [] },
     }
   );
   const [showTriggerSelector, setShowTriggerSelector] = useState(
-    eventType === 'event' && !event
+    (eventType === 'event' || eventType === 'anti-hack') && !event
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(eventConfig.flowData?.nodes || []);
@@ -1300,6 +1398,8 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         triggerConfig = TRIGGER_TYPES.command;
       } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
         triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+      } else if (eventConfig.type === 'anti-hack' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageSpam;
       } else {
         triggerConfig = TRIGGER_TYPES.command;
       }
@@ -1321,7 +1421,7 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         }));
         outputs = [...baseOutputs, ...optionOutputs];
       } else {
-        // Event triggers have predefined outputs
+        // Event triggers and anti-hack triggers have predefined outputs
         outputs = triggerConfig.outputs || [];
       }
 
@@ -1392,6 +1492,9 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
         newOutputs = [...baseOutputs, ...optionOutputs];
       } else if (eventConfig.type === 'event' && eventConfig.triggerType) {
         triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageCreate;
+        newOutputs = triggerConfig.outputs || [];
+      } else if (eventConfig.type === 'anti-hack' && eventConfig.triggerType) {
+        triggerConfig = TRIGGER_TYPES[eventConfig.triggerType] || TRIGGER_TYPES.messageSpam;
         newOutputs = triggerConfig.outputs || [];
       } else {
         return; // No valid config
@@ -1761,18 +1864,84 @@ function FlowEventEditor({ event, eventType, onSave, onClose }) {
     },
   ];
 
+  // Anti-Hack trigger options
+  const ANTIHACK_TRIGGER_OPTIONS = [
+    {
+      key: 'messageSpam',
+      label: 'Message Spam',
+      icon: '⚡',
+      description: 'Detect users sending too many messages too quickly',
+      color: '#ed4245',
+    },
+    {
+      key: 'suspiciousEdit',
+      label: 'Suspicious Edits',
+      icon: '✏️',
+      description: 'Detect rapid or unusual message editing patterns',
+      color: '#f39c12',
+    },
+    {
+      key: 'massDelete',
+      label: 'Mass Delete',
+      icon: '🗑️',
+      description: 'Detect users deleting many messages rapidly',
+      color: '#e74c3c',
+    },
+    {
+      key: 'linkSpam',
+      label: 'Link Spam',
+      icon: '🔗',
+      description: 'Detect users posting too many links',
+      color: '#3498db',
+    },
+    {
+      key: 'attachmentSpam',
+      label: 'Attachment Spam',
+      icon: '📎',
+      description: 'Detect users posting too many files/images',
+      color: '#9b59b6',
+    },
+    {
+      key: 'mentionSpam',
+      label: 'Mention Spam',
+      icon: '@',
+      description: 'Detect users @mentioning too many people',
+      color: '#e67e22',
+    },
+    {
+      key: 'emojiSpam',
+      label: 'Emoji Spam',
+      icon: '😂',
+      description: 'Detect messages with excessive emojis',
+      color: '#faa61a',
+    },
+    {
+      key: 'duplicateMessages',
+      label: 'Duplicate Messages',
+      icon: '📋',
+      description: 'Detect users sending the same message repeatedly',
+      color: '#95a5a6',
+    },
+  ];
+
   if (showTriggerSelector) {
+    const isAntiHack = eventType === 'anti-hack';
+    const triggersToShow = isAntiHack ? ANTIHACK_TRIGGER_OPTIONS : TRIGGER_OPTIONS;
+    const headerText = isAntiHack
+      ? 'Select what suspicious behavior should trigger your anti-hack protection'
+      : 'Select what Discord event should trigger your bot\'s actions';
+
     return (
-      <Modal isOpen={true} onClose={onClose} title="Choose Event Trigger" className="flow-editor-modal">
+      <Modal isOpen={true} onClose={onClose} title={isAntiHack ? "Choose Anti-Hack Detection" : "Choose Event Trigger"} className="flow-editor-modal">
         <div className="event-type-selector">
           <div className="selector-header">
-            <h2>Choose a Trigger Type</h2>
+            <h2>{isAntiHack ? '🛡️ Choose Detection Type' : 'Choose a Trigger Type'}</h2>
             <p style={{ color: '#b5bac1', fontSize: '14px', marginTop: '8px' }}>
-              Select what Discord event should trigger your bot's actions
+              {headerText}
             </p>
           </div>
           <div className="event-types-grid">
-            {TRIGGER_OPTIONS.map((trigger) => (
+            {triggersToShow.map((trigger) => (
               <div
                 key={trigger.key}
                 className="event-type-card"
