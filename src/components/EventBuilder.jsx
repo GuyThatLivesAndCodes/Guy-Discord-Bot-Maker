@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import FlowEventEditor from './FlowEventEditor';
+import BlueprintCanvas from './BlueprintCanvas';
 import './EventBuilder.css';
 
 // Event types
@@ -95,10 +95,18 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
   return (
     <div className="event-builder">
       {showFlowEditor && (
-        <FlowEventEditor
-          event={editingIndex !== null ? events[editingIndex] : null}
-          eventType={editingIndex !== null ? events[editingIndex].type : selectedEventType}
-          onSave={handleSave}
+        <BlueprintCanvas
+          initialNodes={editingIndex !== null ? events[editingIndex]?.flowData?.nodes || [] : []}
+          initialEdges={editingIndex !== null ? events[editingIndex]?.flowData?.edges || [] : []}
+          onSave={(flowData) => {
+            const event = editingIndex !== null ? events[editingIndex] : {
+              type: selectedEventType,
+              name: selectedEventType === 'command' ? 'newcommand' : '',
+              description: '',
+              flowData: { nodes: [], edges: [] }
+            };
+            handleSave({ ...event, flowData });
+          }}
           onClose={handleClose}
         />
       )}

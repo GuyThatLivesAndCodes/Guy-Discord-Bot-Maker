@@ -18,7 +18,7 @@ const nodeTypes = {
   blueprintNode: BlueprintNode,
 };
 
-const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave }) => {
+const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave, onClose }) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [searchQuery, setSearchQuery] = useState('');
@@ -186,7 +186,7 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave }) => {
   });
 
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+    <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1000, background: '#1a1a1a' }}>
       {/* Top Toolbar */}
       <div
         style={{
@@ -230,6 +230,22 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], onSave }) => {
         >
           💾 Save
         </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 16px',
+              background: '#e74c3c',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            ✕ Close
+          </button>
+        )}
       </div>
 
       {/* Node Palette */}
