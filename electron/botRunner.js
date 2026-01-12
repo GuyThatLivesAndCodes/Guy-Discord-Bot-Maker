@@ -433,12 +433,10 @@ class BotRunner {
     // Set up commands collection
     this.client.commands = new Collection();
 
-    // Get command events from the events array
-    const commandEvents = (this.config.events || []).filter(event => event.type === 'command');
-
-    // Register commands from events
-    if (commandEvents.length > 0) {
-      await this.registerCommands(commandEvents);
+    // Scan ALL events for ON_SLASH_COMMAND nodes and register them
+    const allEvents = this.config.events || [];
+    if (allEvents.length > 0) {
+      await this.registerCommands(allEvents);
     }
 
     // Set up event handlers
@@ -454,106 +452,118 @@ class BotRunner {
     }
   }
 
-  async registerCommands(commandEvents) {
+  async registerCommands(allEvents) {
     const { isBlueprintEvent, extractCommandConfiguration } = require('./blueprintExecutor');
 
-    const commands = commandEvents.map(cmd => {
-      // Check if this is a blueprint event with command configuration
-      if (isBlueprintEvent(cmd) && cmd.flowData) {
-        const blueprintConfig = extractCommandConfiguration(cmd.flowData);
+    this.log('info', `Scanning ${allEvents.length} events for slash commands...`);
 
-        if (blueprintConfig) {
-          this.log('info', `Found blueprint command: ${blueprintConfig.name}`);
+    const commands = [];
+    const commandEventMap = new Map(); // Map command names to events for execution
 
-          // Use blueprint configuration
-          const command = {
-            name: blueprintConfig.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
-            description: blueprintConfig.description || 'A slash command',
-          };
+    // Scan all events for ON_SLASH_COMMAND nodes
+    allEvents.forEach(event => {
+      if (!isBlueprintEvent(event) || !event.flowData || !event.flowData.nodes) {
+        return;
+      }
 
-          // Add options from blueprint
-          if (blueprintConfig.options && blueprintConfig.options.length > 0) {
-            command.options = blueprintConfig.options.map(opt => {
-              const option = {
-                name: opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
-                description: opt.description || `${opt.name} parameter`,
-                required: opt.required || false,
-              };
+      // Find all ON_SLASH_COMMAND nodes in this event
+      const commandNodes = event.flowData.nodes.filter(node =>
+        node.type === 'blueprintNode' &&
+        node.data?.definitionId &&
+        (node.data.definitionId === 'event-slash-command' || node.data.definitionId === 'ON_SLASH_COMMAND')
+      );
 
-              // Map our types to Discord's ApplicationCommandOptionType
-              const typeMap = {
-                'STRING': 3,
-                'NUMBER': 10,
-                'BOOLEAN': 5,
-                'USER': 6,
-                'CHANNEL': 7,
-                'ROLE': 8,
-                'ATTACHMENT': 11,
-              };
+      if (commandNodes.length === 0) {
+        return;
+      }
 
-              option.type = typeMap[opt.type] || 3; // Default to STRING
-              return option;
-            });
-          }
+      this.log('info', `Found ${commandNodes.length} command node(s) in event "${event.name}"`);
 
-          // Store blueprint config back to cmd for execution
-          cmd.name = blueprintConfig.name;
-          cmd.description = blueprintConfig.description;
-          cmd.options = blueprintConfig.options;
+      // Process each command node
+      commandNodes.forEach(commandNode => {
+        const commandName = commandNode.data?.config?.commandName;
+        const commandDescription = commandNode.data?.config?.commandDescription || 'A slash command';
 
-          return command;
-        } else {
-          this.log('warning', `Blueprint command is missing configuration (check ON_SLASH_COMMAND node config)`);
+        if (!commandName || commandName.trim() === '') {
+          this.log('warning', `ON_SLASH_COMMAND node in "${event.name}" is missing command name - skipping`);
+          return;
         }
-      }
 
-      // Fallback to legacy command configuration
-      if (!cmd.name) {
-        this.log('error', `Command is missing a name - skipping`);
-        return null;
-      }
+        this.log('info', `Registering command: /${commandName}`);
 
-      this.log('info', `Found legacy command: ${cmd.name}`);
+        // Find all option nodes in this event
+        const optionNodes = event.flowData.nodes.filter(node =>
+          node.type === 'blueprintNode' &&
+          node.data?.definitionId &&
+          (node.data.definitionId.startsWith('OPTION_') || node.data.definitionId.startsWith('pure-option-'))
+        );
 
-      const command = {
-        name: cmd.name,
-        description: cmd.description || 'No description provided',
-      };
+        // Build command structure for Discord
+        const command = {
+          name: commandName.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+          description: commandDescription,
+        };
 
-      // Add command options if they exist
-      if (cmd.options && cmd.options.length > 0) {
-        command.options = cmd.options.map(opt => {
-          const option = {
-            name: opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'), // Discord requires lowercase alphanumeric
-            description: opt.description || `${opt.name} parameter`,
-            required: opt.required || false,
-          };
+        // Add options if any
+        if (optionNodes.length > 0) {
+          command.options = optionNodes.map(optionNode => {
+            const optionDef = optionNode.data?.definitionId;
+            const config = optionNode.data?.config || {};
 
-          // Map our types to Discord's ApplicationCommandOptionType
-          const typeMap = {
-            'STRING': 3,
-            'NUMBER': 10,
-            'BOOLEAN': 5,
-            'USER': 6,
-            'CHANNEL': 7,
-            'ROLE': 8,
-            'ATTACHMENT': 11,
-          };
+            const typeMapping = {
+              'OPTION_STRING': 'STRING',
+              'OPTION_NUMBER': 'NUMBER',
+              'OPTION_BOOLEAN': 'BOOLEAN',
+              'OPTION_USER': 'USER',
+              'OPTION_CHANNEL': 'CHANNEL',
+              'OPTION_ROLE': 'ROLE',
+              'pure-option-string': 'STRING',
+              'pure-option-number': 'NUMBER',
+              'pure-option-boolean': 'BOOLEAN',
+              'pure-option-user': 'USER',
+              'pure-option-channel': 'CHANNEL',
+              'pure-option-role': 'ROLE',
+            };
 
-          option.type = typeMap[opt.type] || 3; // Default to STRING
-          return option;
-        });
-      }
+            const typeMap = {
+              'STRING': 3,
+              'NUMBER': 10,
+              'BOOLEAN': 5,
+              'USER': 6,
+              'CHANNEL': 7,
+              'ROLE': 8,
+            };
 
-      return command;
-    }).filter(cmd => cmd !== null); // Filter out invalid commands
+            const optionType = typeMapping[optionDef] || 'STRING';
 
-    // Store commands in the client (only those with valid names)
-    commandEvents.forEach(cmd => {
-      if (cmd.name) {
-        this.client.commands.set(cmd.name, cmd);
-        this.log('info', `Stored command in client: ${cmd.name}`);
-      }
+            return {
+              name: (config.optionName || 'option').toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+              description: config.description || 'An option',
+              required: config.required || false,
+              type: typeMap[optionType] || 3,
+            };
+          }).filter(opt => opt.name !== 'option'); // Filter unconfigured options
+
+          if (command.options.length > 0) {
+            this.log('info', `  - ${command.options.length} option(s): ${command.options.map(o => o.name).join(', ')}`);
+          }
+        }
+
+        commands.push(command);
+
+        // Store the event for this command so we can execute it later
+        commandEventMap.set(command.name, event);
+      });
+    });
+
+    if (commands.length === 0) {
+      this.log('info', 'No slash commands found in events');
+      return;
+    }
+
+    // Store command events in client for execution
+    commandEventMap.forEach((event, commandName) => {
+      this.client.commands.set(commandName, event);
     });
 
     // Register slash commands with Discord
@@ -563,22 +573,27 @@ class BotRunner {
 
         if (this.config.guildId) {
           // Register to specific guild (instant update)
+          this.log('info', `Registering ${commands.length} command(s) to guild ${this.config.guildId}...`);
           await rest.put(
             Routes.applicationGuildCommands(this.config.applicationId, this.config.guildId),
             { body: commands }
           );
-          this.log('info', `Registered ${commands.length} guild commands`);
+          this.log('success', `✅ Registered ${commands.length} guild command(s): ${commands.map(c => '/' + c.name).join(', ')}`);
         } else {
           // Register globally (takes up to 1 hour)
+          this.log('info', `Registering ${commands.length} command(s) globally...`);
           await rest.put(
             Routes.applicationCommands(this.config.applicationId),
             { body: commands }
           );
-          this.log('info', `Registered ${commands.length} global commands`);
+          this.log('success', `✅ Registered ${commands.length} global command(s): ${commands.map(c => '/' + c.name).join(', ')}`);
+          this.log('warning', 'Global commands can take up to 1 hour to update');
         }
       } catch (error) {
         this.log('error', `Failed to register commands: ${error.message}`);
       }
+    } else {
+      this.log('warning', `Found ${commands.length} command(s) but Application ID is not set - commands will not be registered`);
     }
   }
 
