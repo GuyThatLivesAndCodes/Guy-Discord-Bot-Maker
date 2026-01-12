@@ -170,6 +170,23 @@ export const ActionNodes = {
       { id: 'embed', label: 'Embed', type: PinTypes.EMBED },
     ],
   },
+
+  SET_PRESENCE: {
+    id: 'action-set-presence',
+    category: NodeCategory.ACTION,
+    label: 'Set Bot Presence',
+    description: 'Set the bot\'s status and activity',
+    icon: '🎮',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [
+      { id: 'activityType', label: 'Activity Type', type: PinTypes.STRING, optional: true },
+      { id: 'activityName', label: 'Activity Name', type: PinTypes.STRING, optional: true },
+      { id: 'status', label: 'Status', type: PinTypes.STRING, optional: true },
+      { id: 'url', label: 'Stream URL', type: PinTypes.STRING, optional: true },
+    ],
+    dataOutputs: [],
+  },
 };
 
 // ============================================================================

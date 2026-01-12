@@ -806,6 +806,57 @@ async function executeAction(actionId, inputs, context) {
         return { embed };
       }
 
+      case 'action-set-presence': {
+        // Get bot client from context
+        const client = context.client?.client;
+        if (!client || !client.user) {
+          console.error('[Blueprint] No client available for set presence');
+          return null;
+        }
+
+        // Map activity type strings to Discord.js ActivityType enum
+        const activityTypeMap = {
+          'playing': 0,
+          'streaming': 1,
+          'listening': 2,
+          'watching': 3,
+          'competing': 5,
+        };
+
+        // Map status strings to Discord.js PresenceUpdateStatus
+        const statusMap = {
+          'online': 'online',
+          'idle': 'idle',
+          'dnd': 'dnd',
+          'invisible': 'invisible',
+        };
+
+        const activityType = inputs.activityType?.toLowerCase() || 'playing';
+        const activityName = inputs.activityName || '';
+        const status = inputs.status?.toLowerCase() || 'online';
+        const url = inputs.url || null;
+
+        const presence = {
+          status: statusMap[status] || 'online',
+        };
+
+        if (activityName) {
+          presence.activities = [{
+            name: activityName,
+            type: activityTypeMap[activityType] || 0,
+          }];
+
+          // Add URL for streaming
+          if (activityType === 'streaming' && url) {
+            presence.activities[0].url = url;
+          }
+        }
+
+        await client.user.setPresence(presence);
+        console.log('[Blueprint] Set presence:', presence);
+        return {};
+      }
+
       default:
         console.warn('[Blueprint] Unknown action:', actionId);
         return null;
