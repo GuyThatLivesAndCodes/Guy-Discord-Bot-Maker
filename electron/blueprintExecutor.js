@@ -45,20 +45,22 @@ function findEventNode(flowData, eventType) {
     const defId = node.data?.definitionId;
     if (!defId) return false;
 
-    // Map Discord event types to blueprint event nodes
+    // Map Discord event types to blueprint event nodes (support both old and new formats)
     const eventMapping = {
-      messageCreate: 'ON_MESSAGE_CREATED',
-      messageDelete: 'ON_MESSAGE_DELETED',
-      guildMemberAdd: 'ON_MEMBER_JOINED',
-      guildMemberRemove: 'ON_MEMBER_LEFT',
-      messageReactionAdd: 'ON_REACTION_ADDED',
-      voiceStateUpdate: 'ON_VOICE_STATE_CHANGED',
-      interactionCreate: 'ON_SLASH_COMMAND',
-      ready: 'ON_BOT_READY',
+      messageCreate: ['event-message-created', 'ON_MESSAGE_CREATED'],
+      messageDelete: ['event-message-deleted', 'ON_MESSAGE_DELETED'],
+      messageUpdate: ['event-message-updated', 'ON_MESSAGE_UPDATED'],
+      guildMemberAdd: ['event-member-join', 'ON_MEMBER_JOINED'],
+      guildMemberRemove: ['event-member-leave', 'ON_MEMBER_LEFT'],
+      messageReactionAdd: ['event-reaction-add', 'ON_REACTION_ADDED'],
+      messageReactionRemove: ['event-reaction-remove', 'ON_REACTION_REMOVED'],
+      voiceStateUpdate: ['event-voice-state-update', 'ON_VOICE_STATE_CHANGED'],
+      interactionCreate: ['event-slash-command', 'ON_SLASH_COMMAND'],
+      ready: ['event-bot-ready', 'ON_BOT_READY'],
     };
 
-    const expectedDefId = eventMapping[eventType];
-    return defId === expectedDefId;
+    const expectedDefIds = eventMapping[eventType];
+    return expectedDefIds && expectedDefIds.includes(defId);
   });
 }
 
