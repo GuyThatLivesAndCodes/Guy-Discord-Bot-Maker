@@ -475,8 +475,6 @@ function computePureNode(nodeId, inputs, context) {
     // String operations
     case 'pure-join-strings':
       return [inputs.a, inputs.b].filter(x => x !== undefined).join(inputs.separator || '');
-    case 'pure-string-contains':
-      return String(inputs.string || '').includes(String(inputs.substring || ''));
     case 'pure-string-uppercase':
       return String(inputs.string || '').toUpperCase();
     case 'pure-string-lowercase':
