@@ -258,8 +258,12 @@ async function executeBlueprintCommand(interaction, command, client) {
   const context = createEventContext('interactionCreate', { interaction });
 
   // Add command options to event node outputs
+  console.log('[BP] Command options:', JSON.stringify(command.options, null, 2));
+  console.log('[BP] Interaction options data:', interaction.options.data);
+
   if (command.options && command.options.length > 0) {
     command.options.forEach((opt) => {
+      console.log(`[BP] Processing option: ${opt.name}, type: ${opt.type}`);
       let value;
 
       // Extract value based on option type
@@ -267,33 +271,45 @@ async function executeBlueprintCommand(interaction, command, client) {
       switch (opt.type) {
         case 7: // CHANNEL
           value = interaction.options.getChannel(opt.name);
+          console.log(`[BP] Extracted channel value:`, value);
           break;
         case 6: // USER
           value = interaction.options.getUser(opt.name);
+          console.log(`[BP] Extracted user value:`, value);
           break;
         case 8: // ROLE
           value = interaction.options.getRole(opt.name);
+          console.log(`[BP] Extracted role value:`, value);
           break;
         case 3: // STRING
           value = interaction.options.getString(opt.name);
+          console.log(`[BP] Extracted string value:`, value);
           break;
         case 4: // INTEGER
         case 10: // NUMBER
           value = interaction.options.getNumber(opt.name);
+          console.log(`[BP] Extracted number value:`, value);
           break;
         case 5: // BOOLEAN
           value = interaction.options.getBoolean(opt.name);
+          console.log(`[BP] Extracted boolean value:`, value);
           break;
         default:
           // Fallback to generic get
           value = interaction.options.get(opt.name)?.value;
+          console.log(`[BP] Extracted generic value:`, value);
       }
 
       if (value !== undefined && value !== null) {
+        console.log(`[BP] Adding to context: ${opt.name} =`, value);
         context[opt.name] = value;
+      } else {
+        console.log(`[BP] Skipping ${opt.name} - value is undefined/null`);
       }
     });
   }
+
+  console.log('[BP] Final context keys:', Object.keys(context));
 
   // Execute the flow
   try {
