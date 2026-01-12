@@ -260,8 +260,36 @@ async function executeBlueprintCommand(interaction, command, client) {
   // Add command options to event node outputs
   if (command.options && command.options.length > 0) {
     command.options.forEach((opt) => {
-      const value = interaction.options.get(opt.name)?.value;
-      if (value !== undefined) {
+      let value;
+
+      // Extract value based on option type
+      // Discord.js ApplicationCommandOptionType: 3=STRING, 4=INTEGER, 5=BOOLEAN, 6=USER, 7=CHANNEL, 8=ROLE, 10=NUMBER
+      switch (opt.type) {
+        case 7: // CHANNEL
+          value = interaction.options.getChannel(opt.name);
+          break;
+        case 6: // USER
+          value = interaction.options.getUser(opt.name);
+          break;
+        case 8: // ROLE
+          value = interaction.options.getRole(opt.name);
+          break;
+        case 3: // STRING
+          value = interaction.options.getString(opt.name);
+          break;
+        case 4: // INTEGER
+        case 10: // NUMBER
+          value = interaction.options.getNumber(opt.name);
+          break;
+        case 5: // BOOLEAN
+          value = interaction.options.getBoolean(opt.name);
+          break;
+        default:
+          // Fallback to generic get
+          value = interaction.options.get(opt.name)?.value;
+      }
+
+      if (value !== undefined && value !== null) {
         context[opt.name] = value;
       }
     });
