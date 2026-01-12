@@ -40,6 +40,7 @@ const NODE_CATEGORIES = {
 
 function getNodeCategory(definitionId) {
   if (NODE_CATEGORIES[definitionId]) return NODE_CATEGORIES[definitionId];
+  if (definitionId.startsWith('event-')) return 'event';
   if (definitionId.startsWith('action-')) return 'action';
   if (definitionId.startsWith('pure-')) return 'pure';
   if (definitionId.startsWith('flow-')) return 'flow';
