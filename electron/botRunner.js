@@ -463,6 +463,8 @@ class BotRunner {
         const blueprintConfig = extractCommandConfiguration(cmd.flowData);
 
         if (blueprintConfig) {
+          this.log('info', `Found blueprint command: ${blueprintConfig.name}`);
+
           // Use blueprint configuration
           const command = {
             name: blueprintConfig.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
@@ -500,10 +502,19 @@ class BotRunner {
           cmd.options = blueprintConfig.options;
 
           return command;
+        } else {
+          this.log('warning', `Blueprint command is missing configuration (check ON_SLASH_COMMAND node config)`);
         }
       }
 
       // Fallback to legacy command configuration
+      if (!cmd.name) {
+        this.log('error', `Command is missing a name - skipping`);
+        return null;
+      }
+
+      this.log('info', `Found legacy command: ${cmd.name}`);
+
       const command = {
         name: cmd.name,
         description: cmd.description || 'No description provided',
@@ -535,11 +546,14 @@ class BotRunner {
       }
 
       return command;
-    });
+    }).filter(cmd => cmd !== null); // Filter out invalid commands
 
-    // Store commands in the client
+    // Store commands in the client (only those with valid names)
     commandEvents.forEach(cmd => {
-      this.client.commands.set(cmd.name, cmd);
+      if (cmd.name) {
+        this.client.commands.set(cmd.name, cmd);
+        this.log('info', `Stored command in client: ${cmd.name}`);
+      }
     });
 
     // Register slash commands with Discord
