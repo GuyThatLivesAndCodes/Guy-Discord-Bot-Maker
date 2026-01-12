@@ -157,9 +157,10 @@ function extractCommandConfiguration(flowData) {
     return null;
   }
 
-  // Find the ON_SLASH_COMMAND event node
+  // Find the ON_SLASH_COMMAND event node (support both old and new formats)
   const commandNode = flowData.nodes.find((node) =>
-    node.type === 'blueprintNode' && node.data?.definitionId === 'ON_SLASH_COMMAND'
+    node.type === 'blueprintNode' &&
+    (node.data?.definitionId === 'event-slash-command' || node.data?.definitionId === 'ON_SLASH_COMMAND')
   );
 
   if (!commandNode) {
@@ -175,11 +176,11 @@ function extractCommandConfiguration(flowData) {
     return null;
   }
 
-  // Find all option nodes in the graph
+  // Find all option nodes in the graph (support both old and new formats)
   const optionNodes = flowData.nodes.filter((node) =>
     node.type === 'blueprintNode' &&
     node.data?.definitionId &&
-    node.data.definitionId.startsWith('OPTION_')
+    (node.data.definitionId.startsWith('OPTION_') || node.data.definitionId.startsWith('pure-option-'))
   );
 
   // Build options array
@@ -187,7 +188,7 @@ function extractCommandConfiguration(flowData) {
     const optionDef = optionNode.data?.definitionId;
     const config = optionNode.data?.config || {};
 
-    // Map option definition IDs to Discord types
+    // Map option definition IDs to Discord types (support both old and new formats)
     const typeMapping = {
       'OPTION_STRING': 'STRING',
       'OPTION_NUMBER': 'NUMBER',
@@ -195,6 +196,12 @@ function extractCommandConfiguration(flowData) {
       'OPTION_USER': 'USER',
       'OPTION_CHANNEL': 'CHANNEL',
       'OPTION_ROLE': 'ROLE',
+      'pure-option-string': 'STRING',
+      'pure-option-number': 'NUMBER',
+      'pure-option-boolean': 'BOOLEAN',
+      'pure-option-user': 'USER',
+      'pure-option-channel': 'CHANNEL',
+      'pure-option-role': 'ROLE',
     };
 
     return {

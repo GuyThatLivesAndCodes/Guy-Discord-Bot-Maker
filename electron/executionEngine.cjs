@@ -532,6 +532,86 @@ function computePureNode(nodeId, inputs, context) {
     case 'pure-to-number':
       return Number(inputs.value) || 0;
 
+    // New string operations
+    case 'pure-string-join': {
+      // Join all string inputs together
+      const values = [];
+      for (let i = 1; i <= 10; i++) {
+        const key = `string${i}`;
+        if (inputs[key] !== undefined) {
+          values.push(String(inputs[key]));
+        }
+      }
+      return values.join('');
+    }
+    case 'pure-string-equals': {
+      const a = String(inputs.a || '');
+      const b = String(inputs.b || '');
+      const caseSensitive = inputs.caseSensitive !== false; // Default true
+      if (caseSensitive) {
+        return a === b;
+      } else {
+        return a.toLowerCase() === b.toLowerCase();
+      }
+    }
+    case 'pure-string-contains': {
+      const text = String(inputs.text || '');
+      const search = String(inputs.search || '');
+      const caseSensitive = inputs.caseSensitive !== false; // Default true
+      if (caseSensitive) {
+        return text.includes(search);
+      } else {
+        return text.toLowerCase().includes(search.toLowerCase());
+      }
+    }
+
+    // New math operations
+    case 'pure-math-add':
+      return (inputs.a || 0) + (inputs.b || 0);
+    case 'pure-math-subtract':
+      return (inputs.a || 0) - (inputs.b || 0);
+    case 'pure-math-multiply':
+      return (inputs.a || 0) * (inputs.b || 0);
+    case 'pure-math-divide':
+      return inputs.b !== 0 ? (inputs.a || 0) / inputs.b : 0;
+
+    // New comparison operations
+    case 'pure-compare-equal':
+      return inputs.a === inputs.b;
+    case 'pure-compare-not-equal':
+      return inputs.a !== inputs.b;
+    case 'pure-compare-greater':
+      return (inputs.a || 0) > (inputs.b || 0);
+    case 'pure-compare-less':
+      return (inputs.a || 0) < (inputs.b || 0);
+    case 'pure-compare-greater-equal':
+      return (inputs.a || 0) >= (inputs.b || 0);
+    case 'pure-compare-less-equal':
+      return (inputs.a || 0) <= (inputs.b || 0);
+
+    // Discord permission and role checks
+    case 'pure-check-permission': {
+      const member = inputs.member;
+      const permission = inputs.permission;
+      if (!member || !permission) return false;
+      try {
+        // member.permissions is a PermissionsBitField
+        return member.permissions?.has(permission) || false;
+      } catch (e) {
+        return false;
+      }
+    }
+    case 'pure-check-role': {
+      const member = inputs.member;
+      const roleId = inputs.roleId;
+      if (!member || !roleId) return false;
+      try {
+        return member.roles?.cache?.has(roleId) || false;
+      } catch (e) {
+        return false;
+      }
+    }
+
     // Command Options - read values from interaction context
     case 'OPTION_STRING':
     case 'pure-option-string': {

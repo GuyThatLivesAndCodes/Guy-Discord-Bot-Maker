@@ -342,6 +342,280 @@ export const PureNodes = {
     isCommandOption: true,
     optionType: 'ROLE',
   },
+
+  // ============================================================================
+  // STRING OPERATIONS
+  // ============================================================================
+
+  STRING_JOIN: {
+    id: 'pure-string-join',
+    category: NodeCategory.PURE,
+    label: 'Join Strings',
+    description: 'Concatenate multiple strings together',
+    icon: '🔗',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'string1', label: 'String 1', type: PinTypes.STRING, optional: true },
+      { id: 'string2', label: 'String 2', type: PinTypes.STRING, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.STRING },
+    ],
+    supportsDynamicInputs: true,
+  },
+
+  STRING_EQUALS: {
+    id: 'pure-string-equals',
+    category: NodeCategory.PURE,
+    label: 'Text Equals',
+    description: 'Check if two strings are equal',
+    icon: '=',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'Text A', type: PinTypes.STRING, optional: false },
+      { id: 'b', label: 'Text B', type: PinTypes.STRING, optional: false },
+      { id: 'caseSensitive', label: 'Case Sensitive', type: PinTypes.BOOLEAN, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  STRING_CONTAINS: {
+    id: 'pure-string-contains',
+    category: NodeCategory.PURE,
+    label: 'Text Contains',
+    description: 'Check if text contains substring',
+    icon: '🔍',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'text', label: 'Text', type: PinTypes.STRING, optional: false },
+      { id: 'search', label: 'Search For', type: PinTypes.STRING, optional: false },
+      { id: 'caseSensitive', label: 'Case Sensitive', type: PinTypes.BOOLEAN, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  // ============================================================================
+  // MATH OPERATIONS
+  // ============================================================================
+
+  MATH_ADD: {
+    id: 'pure-math-add',
+    category: NodeCategory.PURE,
+    label: 'Add',
+    description: 'Add two numbers',
+    icon: '+',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.NUMBER },
+    ],
+  },
+
+  MATH_SUBTRACT: {
+    id: 'pure-math-subtract',
+    category: NodeCategory.PURE,
+    label: 'Subtract',
+    description: 'Subtract B from A',
+    icon: '−',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.NUMBER },
+    ],
+  },
+
+  MATH_MULTIPLY: {
+    id: 'pure-math-multiply',
+    category: NodeCategory.PURE,
+    label: 'Multiply',
+    description: 'Multiply two numbers',
+    icon: '×',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.NUMBER },
+    ],
+  },
+
+  MATH_DIVIDE: {
+    id: 'pure-math-divide',
+    category: NodeCategory.PURE,
+    label: 'Divide',
+    description: 'Divide A by B',
+    icon: '÷',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.NUMBER },
+    ],
+  },
+
+  // ============================================================================
+  // COMPARISON OPERATIONS
+  // ============================================================================
+
+  COMPARE_EQUAL: {
+    id: 'pure-compare-equal',
+    category: NodeCategory.PURE,
+    label: 'Equal (==)',
+    description: 'Check if A equals B',
+    icon: '==',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  COMPARE_NOT_EQUAL: {
+    id: 'pure-compare-not-equal',
+    category: NodeCategory.PURE,
+    label: 'Not Equal (!=)',
+    description: 'Check if A does not equal B',
+    icon: '≠',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  COMPARE_GREATER: {
+    id: 'pure-compare-greater',
+    category: NodeCategory.PURE,
+    label: 'Greater Than (>)',
+    description: 'Check if A is greater than B',
+    icon: '>',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  COMPARE_LESS: {
+    id: 'pure-compare-less',
+    category: NodeCategory.PURE,
+    label: 'Less Than (<)',
+    description: 'Check if A is less than B',
+    icon: '<',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  COMPARE_GREATER_EQUAL: {
+    id: 'pure-compare-greater-equal',
+    category: NodeCategory.PURE,
+    label: 'Greater or Equal (>=)',
+    description: 'Check if A is greater than or equal to B',
+    icon: '≥',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  COMPARE_LESS_EQUAL: {
+    id: 'pure-compare-less-equal',
+    category: NodeCategory.PURE,
+    label: 'Less or Equal (<=)',
+    description: 'Check if A is less than or equal to B',
+    icon: '≤',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'a', label: 'A', type: PinTypes.NUMBER, optional: false },
+      { id: 'b', label: 'B', type: PinTypes.NUMBER, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  // ============================================================================
+  // DISCORD CHECKS
+  // ============================================================================
+
+  CHECK_PERMISSION: {
+    id: 'pure-check-permission',
+    category: NodeCategory.PURE,
+    label: 'Check Permission',
+    description: 'Check if member has a permission',
+    icon: '🔒',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'member', label: 'Member', type: PinTypes.MEMBER, optional: false },
+      { id: 'permission', label: 'Permission', type: PinTypes.STRING, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Has Permission', type: PinTypes.BOOLEAN },
+    ],
+  },
+
+  CHECK_ROLE: {
+    id: 'pure-check-role',
+    category: NodeCategory.PURE,
+    label: 'Check Role',
+    description: 'Check if member has a role',
+    icon: '🎭',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'member', label: 'Member', type: PinTypes.MEMBER, optional: false },
+      { id: 'roleId', label: 'Role ID', type: PinTypes.STRING, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Has Role', type: PinTypes.BOOLEAN },
+    ],
+  },
 };
 
 // ============================================================================
@@ -349,7 +623,22 @@ export const PureNodes = {
 // ============================================================================
 
 export const FlowControlNodes = {
-  // Empty for now - start simple!
+  BRANCH: {
+    id: 'flow-branch',
+    category: NodeCategory.FLOW,
+    label: 'Branch',
+    description: 'Execute different paths based on a condition',
+    icon: '🔀',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [
+      { id: 'true', label: 'True' },
+      { id: 'false', label: 'False' },
+    ],
+    dataInputs: [
+      { id: 'condition', label: 'Condition', type: PinTypes.BOOLEAN, optional: false },
+    ],
+    dataOutputs: [],
+  },
 };
 
 // ============================================================================
