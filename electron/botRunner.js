@@ -762,6 +762,44 @@ class BotRunner {
           this.log('info', `Registered blueprint event: ${event.name} for voiceStateUpdate`);
           break;
 
+        case 'event-voice-join':
+          this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            // Detect join: was not in a channel, now is in a channel
+            if (!oldState.channel && newState.channel) {
+              try {
+                this.log('info', `Executing blueprint event "${event.name}" for voice join`);
+                await executeBlueprintEvent('voiceJoin', {
+                  member: newState.member,
+                  channel: newState.channel,
+                  guild: newState.guild,
+                }, event, this);
+              } catch (error) {
+                this.log('error', `Blueprint event error: ${error.message}`);
+              }
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for voice join`);
+          break;
+
+        case 'event-voice-leave':
+          this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            // Detect leave: was in a channel, now is not in a channel
+            if (oldState.channel && !newState.channel) {
+              try {
+                this.log('info', `Executing blueprint event "${event.name}" for voice leave`);
+                await executeBlueprintEvent('voiceLeave', {
+                  member: oldState.member,
+                  channel: oldState.channel,
+                  guild: oldState.guild,
+                }, event, this);
+              } catch (error) {
+                this.log('error', `Blueprint event error: ${error.message}`);
+              }
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for voice leave`);
+          break;
+
         case 'event-slash-command':
         case 'ON_SLASH_COMMAND':
           // Slash commands are handled separately via command registration
@@ -2671,6 +2709,157 @@ class BotRunner {
     }
 
     return output; // Return computed values
+  }
+
+  // ============================================================================
+  // Voice Channel Methods
+  // ============================================================================
+
+  async joinVoiceChannel(channel) {
+    if (!voiceModule) {
+      throw new Error('Voice support not available');
+    }
+
+    const { joinVoiceChannel } = voiceModule;
+    const guildId = channel.guild.id;
+
+    try {
+      // Check if already connected
+      if (this.voiceConnections.has(guildId)) {
+        const existingConnection = this.voiceConnections.get(guildId);
+        if (existingConnection.joinConfig.channelId === channel.id) {
+          this.log('info', `Already connected to voice channel ${channel.name}`);
+          return existingConnection;
+        }
+        // Leave current channel if different
+        existingConnection.destroy();
+      }
+
+      this.log('info', `Joining voice channel: ${channel.name}`);
+
+      const connection = joinVoiceChannel({
+        channelId: channel.id,
+        guildId: guildId,
+        adapterCreator: channel.guild.voiceAdapterCreator,
+      });
+
+      this.voiceConnections.set(guildId, connection);
+      this.log('success', `Joined voice channel: ${channel.name}`);
+
+      return connection;
+    } catch (error) {
+      this.log('error', `Failed to join voice channel: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async leaveVoiceChannel(guildId) {
+    if (!this.voiceConnections.has(guildId)) {
+      this.log('warning', 'Not connected to any voice channel in this guild');
+      return;
+    }
+
+    try {
+      const connection = this.voiceConnections.get(guildId);
+
+      // Stop audio if playing
+      if (this.audioPlayers.has(guildId)) {
+        const player = this.audioPlayers.get(guildId);
+        player.stop();
+        this.audioPlayers.delete(guildId);
+      }
+
+      connection.destroy();
+      this.voiceConnections.delete(guildId);
+
+      this.log('success', 'Left voice channel');
+    } catch (error) {
+      this.log('error', `Failed to leave voice channel: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async playSound(channel, filePath, volume = 1.0, callbacks = {}) {
+    if (!voiceModule) {
+      throw new Error('Voice support not available');
+    }
+
+    const { createAudioResource, createAudioPlayer, AudioPlayerStatus } = voiceModule;
+    const guildId = channel.guild.id;
+
+    try {
+      // Join voice channel if not already connected
+      let connection = this.voiceConnections.get(guildId);
+      if (!connection || connection.joinConfig.channelId !== channel.id) {
+        connection = await this.joinVoiceChannel(channel);
+      }
+
+      this.log('info', `Playing sound: ${filePath}`);
+
+      // Create audio resource with volume
+      const resource = createAudioResource(filePath, {
+        inlineVolume: true,
+      });
+
+      if (resource.volume) {
+        resource.volume.setVolume(Math.max(0, Math.min(2, volume)));
+      }
+
+      // Create or reuse audio player
+      let player = this.audioPlayers.get(guildId);
+      if (!player) {
+        player = createAudioPlayer();
+        this.audioPlayers.set(guildId, player);
+
+        // Set up player event listeners
+        player.on(AudioPlayerStatus.Playing, () => {
+          this.log('info', 'Audio playback started');
+          if (callbacks.onStart) {
+            callbacks.onStart().catch(err => {
+              this.log('error', `onStart callback error: ${err.message}`);
+            });
+          }
+        });
+
+        player.on(AudioPlayerStatus.Idle, () => {
+          this.log('info', 'Audio playback ended');
+          if (callbacks.onEnd) {
+            callbacks.onEnd().catch(err => {
+              this.log('error', `onEnd callback error: ${err.message}`);
+            });
+          }
+        });
+
+        player.on('error', (error) => {
+          this.log('error', `Audio player error: ${error.message}`);
+        });
+      }
+
+      // Play the resource
+      player.play(resource);
+      connection.subscribe(player);
+
+      this.log('success', 'Sound playback started');
+    } catch (error) {
+      this.log('error', `Failed to play sound: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async stopSound(guildId) {
+    if (!this.audioPlayers.has(guildId)) {
+      this.log('warning', 'No audio playing in this guild');
+      return;
+    }
+
+    try {
+      const player = this.audioPlayers.get(guildId);
+      player.stop();
+      this.log('success', 'Stopped audio playback');
+    } catch (error) {
+      this.log('error', `Failed to stop audio: ${error.message}`);
+      throw error;
+    }
   }
 
   stop() {

@@ -76,6 +76,101 @@ export const EventNodes = {
       commandDescription: 'A slash command',
     },
   },
+
+  ON_MESSAGE_UPDATED: {
+    id: 'event-message-updated',
+    category: NodeCategory.EVENT,
+    label: 'On Message Updated',
+    description: 'Triggered when a message is edited',
+    icon: '✏️',
+    execInputs: [],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'oldMessage', label: 'Old Message', type: PinTypes.MESSAGE },
+      { id: 'newMessage', label: 'New Message', type: PinTypes.MESSAGE },
+      { id: 'channel', label: 'Channel', type: PinTypes.CHANNEL },
+    ],
+    discordEvent: 'messageUpdate',
+  },
+
+  ON_MESSAGE_DELETED: {
+    id: 'event-message-deleted',
+    category: NodeCategory.EVENT,
+    label: 'On Message Deleted',
+    description: 'Triggered when a message is deleted',
+    icon: '🗑️',
+    execInputs: [],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'message', label: 'Message', type: PinTypes.MESSAGE },
+      { id: 'channel', label: 'Channel', type: PinTypes.CHANNEL },
+    ],
+    discordEvent: 'messageDelete',
+  },
+
+  ON_VOICE_JOIN: {
+    id: 'event-voice-join',
+    category: NodeCategory.EVENT,
+    label: 'On Voice Join',
+    description: 'Triggered when someone joins a voice channel',
+    icon: '🔊',
+    execInputs: [],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'member', label: 'Member', type: PinTypes.MEMBER },
+      { id: 'channel', label: 'Channel', type: PinTypes.CHANNEL },
+      { id: 'guild', label: 'Guild', type: PinTypes.GUILD },
+    ],
+    discordEvent: 'voiceStateUpdate',
+  },
+
+  ON_VOICE_LEAVE: {
+    id: 'event-voice-leave',
+    category: NodeCategory.EVENT,
+    label: 'On Voice Leave',
+    description: 'Triggered when someone leaves a voice channel',
+    icon: '🔇',
+    execInputs: [],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'member', label: 'Member', type: PinTypes.MEMBER },
+      { id: 'channel', label: 'Channel', type: PinTypes.CHANNEL },
+      { id: 'guild', label: 'Guild', type: PinTypes.GUILD },
+    ],
+    discordEvent: 'voiceStateUpdate',
+  },
+
+  ON_AUDIO_START: {
+    id: 'event-audio-start',
+    category: NodeCategory.EVENT,
+    label: 'On Audio Start',
+    description: 'Triggered when audio playback starts',
+    icon: '▶️',
+    execInputs: [],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'guild', label: 'Guild', type: PinTypes.GUILD },
+    ],
+  },
+
+  ON_AUDIO_END: {
+    id: 'event-audio-end',
+    category: NodeCategory.EVENT,
+    label: 'On Audio End',
+    description: 'Triggered when audio playback ends',
+    icon: '⏹️',
+    execInputs: [],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'guild', label: 'Guild', type: PinTypes.GUILD },
+    ],
+  },
 };
 
 // ============================================================================
@@ -184,6 +279,68 @@ export const ActionNodes = {
       { id: 'activityName', label: 'Activity Name', type: PinTypes.STRING, optional: true },
       { id: 'status', label: 'Status', type: PinTypes.STRING, optional: true },
       { id: 'url', label: 'Stream URL', type: PinTypes.STRING, optional: true },
+    ],
+    dataOutputs: [],
+  },
+
+  JOIN_VOICE_CHANNEL: {
+    id: 'action-join-voice',
+    category: NodeCategory.ACTION,
+    label: 'Join Voice Channel',
+    description: 'Make the bot join a voice channel',
+    icon: '🎤',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [
+      { id: 'channel', label: 'Voice Channel', type: PinTypes.CHANNEL, optional: false },
+    ],
+    dataOutputs: [],
+  },
+
+  LEAVE_VOICE_CHANNEL: {
+    id: 'action-leave-voice',
+    category: NodeCategory.ACTION,
+    label: 'Leave Voice Channel',
+    description: 'Make the bot leave a voice channel',
+    icon: '🚪',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [
+      { id: 'guild', label: 'Guild', type: PinTypes.GUILD, optional: false },
+    ],
+    dataOutputs: [],
+  },
+
+  PLAY_SOUND: {
+    id: 'action-play-sound',
+    category: NodeCategory.ACTION,
+    label: 'Play Sound In VC',
+    description: 'Play an audio file in a voice channel',
+    icon: '🔊',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [
+      { id: 'exec', label: '' },
+      { id: 'onStart', label: 'On Start' },
+      { id: 'onEnd', label: 'On End' },
+    ],
+    dataInputs: [
+      { id: 'channel', label: 'Voice Channel', type: PinTypes.CHANNEL, optional: false },
+      { id: 'filePath', label: 'File Path', type: PinTypes.STRING, optional: false },
+      { id: 'volume', label: 'Volume', type: PinTypes.NUMBER, optional: true },
+    ],
+    dataOutputs: [],
+  },
+
+  STOP_SOUND: {
+    id: 'action-stop-sound',
+    category: NodeCategory.ACTION,
+    label: 'Stop Sound In VC',
+    description: 'Stop audio playback in a voice channel',
+    icon: '⏹️',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [
+      { id: 'guild', label: 'Guild', type: PinTypes.GUILD, optional: false },
     ],
     dataOutputs: [],
   },
@@ -490,6 +647,23 @@ export const PureNodes = {
     ],
   },
 
+  RANDOM_NUMBER: {
+    id: 'pure-random-number',
+    category: NodeCategory.PURE,
+    label: 'Random Number',
+    description: 'Generate a random number between min and max',
+    icon: '🎲',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'min', label: 'Min', type: PinTypes.NUMBER, optional: true },
+      { id: 'max', label: 'Max', type: PinTypes.NUMBER, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'result', label: 'Result', type: PinTypes.NUMBER },
+    ],
+  },
+
   // ============================================================================
   // COMPARISON OPERATIONS
   // ============================================================================
@@ -653,6 +827,27 @@ export const FlowControlNodes = {
     ],
     dataInputs: [
       { id: 'condition', label: 'Condition', type: PinTypes.BOOLEAN, optional: false },
+    ],
+    dataOutputs: [],
+  },
+
+  SWITCH: {
+    id: 'flow-switch',
+    category: NodeCategory.FLOW,
+    label: 'Switch',
+    description: 'Execute different paths based on a number value',
+    icon: '🔢',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [
+      { id: '0', label: '0' },
+      { id: '1', label: '1' },
+      { id: '2', label: '2' },
+      { id: '3', label: '3' },
+      { id: '4', label: '4' },
+      { id: 'default', label: 'Default' },
+    ],
+    dataInputs: [
+      { id: 'value', label: 'Value', type: PinTypes.NUMBER, optional: false },
     ],
     dataOutputs: [],
   },

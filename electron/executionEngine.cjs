@@ -283,6 +283,30 @@ async function executeFlowNode(node, definitionId, flowData, context) {
       break;
     }
 
+    case 'flow-switch': {
+      // Evaluate value
+      const value = await evaluateDataPin(
+        node,
+        'data-in-value',
+        flowData,
+        context
+      );
+
+      // Convert to integer
+      const intValue = Math.floor(value || 0);
+
+      // Follow the matching path or default
+      let path;
+      if (intValue >= 0 && intValue <= 4) {
+        path = String(intValue);
+      } else {
+        path = 'default';
+      }
+
+      await executeFromPin(node.id, `exec-out-${path}`, flowData, context);
+      break;
+    }
+
     case 'flow-delay': {
       // Get duration
       const duration = await evaluateDataPin(
@@ -572,6 +596,11 @@ function computePureNode(nodeId, inputs, context) {
       return (inputs.a || 0) * (inputs.b || 0);
     case 'pure-math-divide':
       return inputs.b !== 0 ? (inputs.a || 0) / inputs.b : 0;
+    case 'pure-random-number': {
+      const min = inputs.min !== undefined ? inputs.min : 0;
+      const max = inputs.max !== undefined ? inputs.max : 100;
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
 
     // New comparison operations
     case 'pure-compare-equal':
@@ -852,6 +881,84 @@ async function executeAction(actionId, inputs, context) {
 
         await client.user.setPresence(presence);
         console.log('[Blueprint] Set presence:', presence);
+        return {};
+      }
+
+      case 'action-join-voice': {
+        const channel = inputs.channel;
+        if (!channel || channel.type !== 2) {  // 2 = GUILD_VOICE
+          console.error('[Blueprint] Invalid voice channel for join');
+          return null;
+        }
+
+        // Call the bot runner's voice join method
+        const botClient = context.client;
+        if (botClient && botClient.joinVoiceChannel) {
+          await botClient.joinVoiceChannel(channel);
+        }
+        return {};
+      }
+
+      case 'action-leave-voice': {
+        const guild = inputs.guild;
+        if (!guild) {
+          console.error('[Blueprint] Invalid guild for leave voice');
+          return null;
+        }
+
+        // Call the bot runner's voice leave method
+        const botClient = context.client;
+        if (botClient && botClient.leaveVoiceChannel) {
+          await botClient.leaveVoiceChannel(guild.id);
+        }
+        return {};
+      }
+
+      case 'action-play-sound': {
+        const channel = inputs.channel;
+        const filePath = inputs.filePath;
+        const volume = inputs.volume !== undefined ? inputs.volume : 1.0;
+
+        if (!channel || channel.type !== 2) {
+          console.error('[Blueprint] Invalid voice channel for play sound');
+          return null;
+        }
+
+        if (!filePath) {
+          console.error('[Blueprint] No file path provided for play sound');
+          return null;
+        }
+
+        // Call the bot runner's play sound method
+        const botClient = context.client;
+        if (botClient && botClient.playSound) {
+          // Play sound with callbacks for onStart and onEnd
+          await botClient.playSound(channel, filePath, volume, {
+            onStart: async () => {
+              // Execute onStart pin if connected
+              await executeFromPin(node.id, 'exec-out-onStart', flowData, context);
+            },
+            onEnd: async () => {
+              // Execute onEnd pin if connected
+              await executeFromPin(node.id, 'exec-out-onEnd', flowData, context);
+            },
+          });
+        }
+        return {};
+      }
+
+      case 'action-stop-sound': {
+        const guild = inputs.guild;
+        if (!guild) {
+          console.error('[Blueprint] Invalid guild for stop sound');
+          return null;
+        }
+
+        // Call the bot runner's stop sound method
+        const botClient = context.client;
+        if (botClient && botClient.stopSound) {
+          await botClient.stopSound(guild.id);
+        }
         return {};
       }
 

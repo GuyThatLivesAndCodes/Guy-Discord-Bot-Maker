@@ -55,6 +55,8 @@ function findEventNode(flowData, eventType) {
       messageReactionAdd: ['event-reaction-add', 'ON_REACTION_ADDED'],
       messageReactionRemove: ['event-reaction-remove', 'ON_REACTION_REMOVED'],
       voiceStateUpdate: ['event-voice-state-update', 'ON_VOICE_STATE_CHANGED'],
+      voiceJoin: ['event-voice-join'],
+      voiceLeave: ['event-voice-leave'],
       interactionCreate: ['event-slash-command', 'ON_SLASH_COMMAND'],
       ready: ['event-bot-ready', 'ON_BOT_READY'],
     };
@@ -105,6 +107,13 @@ function createEventContext(eventType, eventData) {
       context.oldChannel = eventData.oldState.channel;
       context.newChannel = eventData.newState.channel;
       context.guild = eventData.newState.guild;
+      break;
+
+    case 'voiceJoin':
+    case 'voiceLeave':
+      context.member = eventData.member;
+      context.channel = eventData.channel;
+      context.guild = eventData.guild;
       break;
 
     case 'interactionCreate':
