@@ -317,8 +317,8 @@ class BotRunner {
           if (node.type === 'blueprintNode' && node.data?.definitionId) {
             const defId = node.data.definitionId;
 
-            // Track event nodes (ON_MESSAGE_CREATED, etc.)
-            if (defId.startsWith('ON_') || defId.includes('EVENT')) {
+            // Track event nodes (event-message-created or ON_MESSAGE_CREATED, etc.)
+            if (defId.startsWith('event-') || defId.startsWith('ON_') || defId.includes('EVENT')) {
               blueprintEventNodes.add(defId);
             }
 
@@ -332,23 +332,27 @@ class BotRunner {
     });
 
     // Blueprint event nodes that need specific intents
-    if (blueprintEventNodes.has('ON_MESSAGE_CREATED') || blueprintEventNodes.has('ON_MESSAGE_DELETED')) {
+    if (blueprintEventNodes.has('event-message-created') || blueprintEventNodes.has('ON_MESSAGE_CREATED') ||
+        blueprintEventNodes.has('event-message-deleted') || blueprintEventNodes.has('ON_MESSAGE_DELETED') ||
+        blueprintEventNodes.has('event-message-updated') || blueprintEventNodes.has('ON_MESSAGE_UPDATED')) {
       intents.push(GatewayIntentBits.GuildMessages);
       intents.push(GatewayIntentBits.MessageContent);
       this.log('info', 'Blueprint message events detected - loading GuildMessages and MessageContent intents');
     }
 
-    if (blueprintEventNodes.has('ON_MEMBER_JOINED') || blueprintEventNodes.has('ON_MEMBER_LEFT')) {
+    if (blueprintEventNodes.has('event-member-join') || blueprintEventNodes.has('ON_MEMBER_JOINED') ||
+        blueprintEventNodes.has('event-member-leave') || blueprintEventNodes.has('ON_MEMBER_LEFT')) {
       intents.push(GatewayIntentBits.GuildMembers);
       this.log('info', 'Blueprint member events detected - loading GuildMembers intent');
     }
 
-    if (blueprintEventNodes.has('ON_REACTION_ADDED')) {
+    if (blueprintEventNodes.has('event-reaction-add') || blueprintEventNodes.has('ON_REACTION_ADDED') ||
+        blueprintEventNodes.has('event-reaction-remove') || blueprintEventNodes.has('ON_REACTION_REMOVED')) {
       intents.push(GatewayIntentBits.GuildMessageReactions);
       this.log('info', 'Blueprint reaction events detected - loading GuildMessageReactions intent');
     }
 
-    if (blueprintEventNodes.has('ON_VOICE_STATE_CHANGED')) {
+    if (blueprintEventNodes.has('event-voice-state-update') || blueprintEventNodes.has('ON_VOICE_STATE_CHANGED')) {
       intents.push(GatewayIntentBits.GuildVoiceStates);
       this.log('info', 'Blueprint voice events detected - loading GuildVoiceStates intent');
     }
@@ -640,7 +644,7 @@ class BotRunner {
     const eventNodes = event.flowData.nodes.filter(node =>
       node.type === 'blueprintNode' &&
       node.data?.definitionId &&
-      (node.data.definitionId.startsWith('ON_') || node.data.definitionId.includes('EVENT'))
+      (node.data.definitionId.startsWith('event-') || node.data.definitionId.startsWith('ON_') || node.data.definitionId.includes('EVENT'))
     );
 
     if (eventNodes.length === 0) {
@@ -653,6 +657,7 @@ class BotRunner {
       const eventType = eventNode.data.definitionId;
 
       switch (eventType) {
+        case 'event-message-created':
         case 'ON_MESSAGE_CREATED':
           this.client.on('messageCreate', async (message) => {
             if (message.author.bot) return; // Ignore bot messages
@@ -663,9 +668,10 @@ class BotRunner {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
           });
-          this.log('info', `Registered blueprint event: ${event.name} for ON_MESSAGE_CREATED`);
+          this.log('info', `Registered blueprint event: ${event.name} for messageCreate`);
           break;
 
+        case 'event-message-deleted':
         case 'ON_MESSAGE_DELETED':
           this.client.on('messageDelete', async (message) => {
             try {
@@ -675,9 +681,23 @@ class BotRunner {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
           });
-          this.log('info', `Registered blueprint event: ${event.name} for ON_MESSAGE_DELETED`);
+          this.log('info', `Registered blueprint event: ${event.name} for messageDelete`);
           break;
 
+        case 'event-message-updated':
+        case 'ON_MESSAGE_UPDATED':
+          this.client.on('messageUpdate', async (oldMessage, newMessage) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageUpdate`);
+              await executeBlueprintEvent('messageUpdate', { oldMessage, newMessage }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for messageUpdate`);
+          break;
+
+        case 'event-member-join':
         case 'ON_MEMBER_JOINED':
           this.client.on('guildMemberAdd', async (member) => {
             try {
@@ -687,9 +707,10 @@ class BotRunner {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
           });
-          this.log('info', `Registered blueprint event: ${event.name} for ON_MEMBER_JOINED`);
+          this.log('info', `Registered blueprint event: ${event.name} for guildMemberAdd`);
           break;
 
+        case 'event-member-leave':
         case 'ON_MEMBER_LEFT':
           this.client.on('guildMemberRemove', async (member) => {
             try {
@@ -699,9 +720,10 @@ class BotRunner {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
           });
-          this.log('info', `Registered blueprint event: ${event.name} for ON_MEMBER_LEFT`);
+          this.log('info', `Registered blueprint event: ${event.name} for guildMemberRemove`);
           break;
 
+        case 'event-reaction-add':
         case 'ON_REACTION_ADDED':
           this.client.on('messageReactionAdd', async (reaction, user) => {
             try {
@@ -711,9 +733,23 @@ class BotRunner {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
           });
-          this.log('info', `Registered blueprint event: ${event.name} for ON_REACTION_ADDED`);
+          this.log('info', `Registered blueprint event: ${event.name} for messageReactionAdd`);
           break;
 
+        case 'event-reaction-remove':
+        case 'ON_REACTION_REMOVED':
+          this.client.on('messageReactionRemove', async (reaction, user) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageReactionRemove`);
+              await executeBlueprintEvent('messageReactionRemove', { reaction, user }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for messageReactionRemove`);
+          break;
+
+        case 'event-voice-state-update':
         case 'ON_VOICE_STATE_CHANGED':
           this.client.on('voiceStateUpdate', async (oldState, newState) => {
             try {
@@ -723,14 +759,16 @@ class BotRunner {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
           });
-          this.log('info', `Registered blueprint event: ${event.name} for ON_VOICE_STATE_CHANGED`);
+          this.log('info', `Registered blueprint event: ${event.name} for voiceStateUpdate`);
           break;
 
+        case 'event-slash-command':
         case 'ON_SLASH_COMMAND':
           // Slash commands are handled separately via command registration
           // This event node is just for the flow, not for triggering
           break;
 
+        case 'event-bot-ready':
         case 'ON_BOT_READY':
           // Bot ready events are one-time, handled differently
           this.client.once('ready', async (client) => {
@@ -741,7 +779,7 @@ class BotRunner {
               this.log('error', `Blueprint event error: ${error.message}`);
             }
           });
-          this.log('info', `Registered blueprint event: ${event.name} for ON_BOT_READY`);
+          this.log('info', `Registered blueprint event: ${event.name} for ready`);
           break;
 
         default:

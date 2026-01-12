@@ -365,7 +365,13 @@ export const ALL_NODES = {
 
 // Helper function to get node definition by ID
 export function getNodeDefinition(nodeId) {
-  return ALL_NODES[nodeId];
+  // First try direct lookup (for old key-based IDs like 'REPLY_TO_MESSAGE')
+  if (ALL_NODES[nodeId]) {
+    return ALL_NODES[nodeId];
+  }
+
+  // Then search by actual id field (for new IDs like 'action-reply-message')
+  return Object.values(ALL_NODES).find(node => node.id === nodeId);
 }
 
 // Helper function to get all nodes in a category
