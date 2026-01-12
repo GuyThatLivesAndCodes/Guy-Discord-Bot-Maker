@@ -149,7 +149,7 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
           y: Math.random() * 300 + 100,
         },
         data: {
-          definitionId: nodeDefId,
+          definitionId: definition.id,
           label: definition.label,
           icon: definition.icon,
           category: definition.category,
