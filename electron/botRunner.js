@@ -551,8 +551,13 @@ class BotRunner {
 
         commands.push(command);
 
-        // Store the event for this command so we can execute it later
-        commandEventMap.set(command.name, event);
+        // Store the event AND command options for this command so we can execute it later
+        commandEventMap.set(command.name, {
+          ...event,
+          options: command.options,  // Include the options array
+          commandName: command.name,
+          commandDescription: command.description,
+        });
       });
     });
 
