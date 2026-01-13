@@ -294,10 +294,11 @@ class BotRunner {
     const events = this.config.events || [];
     const usedNodeTypes = new Set();
     const usedTriggerTypes = new Set();
+    const blueprintEventNodes = new Set();
 
     // Collect all node types and trigger types used across all events
     events.forEach(event => {
-      // Track event trigger types
+      // Track event trigger types (legacy)
       if (event.type === 'event' && event.triggerType) {
         usedTriggerTypes.add(event.triggerType);
       }
@@ -305,16 +306,58 @@ class BotRunner {
       // Track node types
       if (event.flowData && event.flowData.nodes) {
         event.flowData.nodes.forEach(node => {
+          // Legacy nodes
           if (node.type === 'dataNode' && node.data?.nodeType) {
             usedNodeTypes.add(node.data.nodeType);
           } else if (node.data?.actionType) {
             usedNodeTypes.add(node.data.actionType);
           }
+
+          // Blueprint nodes
+          if (node.type === 'blueprintNode' && node.data?.definitionId) {
+            const defId = node.data.definitionId;
+
+            // Track event nodes (event-message-created or ON_MESSAGE_CREATED, etc.)
+            if (defId.startsWith('event-') || defId.startsWith('ON_') || defId.includes('EVENT')) {
+              blueprintEventNodes.add(defId);
+            }
+
+            // Track action node IDs (action-send-message, etc.)
+            if (defId.startsWith('action-') || defId.startsWith('pure-')) {
+              usedNodeTypes.add(defId);
+            }
+          }
         });
       }
     });
 
-    // Event triggers that need specific intents
+    // Blueprint event nodes that need specific intents
+    if (blueprintEventNodes.has('event-message-created') || blueprintEventNodes.has('ON_MESSAGE_CREATED') ||
+        blueprintEventNodes.has('event-message-deleted') || blueprintEventNodes.has('ON_MESSAGE_DELETED') ||
+        blueprintEventNodes.has('event-message-updated') || blueprintEventNodes.has('ON_MESSAGE_UPDATED')) {
+      intents.push(GatewayIntentBits.GuildMessages);
+      intents.push(GatewayIntentBits.MessageContent);
+      this.log('info', 'Blueprint message events detected - loading GuildMessages and MessageContent intents');
+    }
+
+    if (blueprintEventNodes.has('event-member-join') || blueprintEventNodes.has('ON_MEMBER_JOINED') ||
+        blueprintEventNodes.has('event-member-leave') || blueprintEventNodes.has('ON_MEMBER_LEFT')) {
+      intents.push(GatewayIntentBits.GuildMembers);
+      this.log('info', 'Blueprint member events detected - loading GuildMembers intent');
+    }
+
+    if (blueprintEventNodes.has('event-reaction-add') || blueprintEventNodes.has('ON_REACTION_ADDED') ||
+        blueprintEventNodes.has('event-reaction-remove') || blueprintEventNodes.has('ON_REACTION_REMOVED')) {
+      intents.push(GatewayIntentBits.GuildMessageReactions);
+      this.log('info', 'Blueprint reaction events detected - loading GuildMessageReactions intent');
+    }
+
+    if (blueprintEventNodes.has('event-voice-state-update') || blueprintEventNodes.has('ON_VOICE_STATE_CHANGED')) {
+      intents.push(GatewayIntentBits.GuildVoiceStates);
+      this.log('info', 'Blueprint voice events detected - loading GuildVoiceStates intent');
+    }
+
+    // Legacy event triggers that need specific intents
     if (usedTriggerTypes.has('messageCreate') || usedTriggerTypes.has('messageDelete')) {
       intents.push(GatewayIntentBits.GuildMessages);
       intents.push(GatewayIntentBits.MessageContent);
@@ -344,7 +387,8 @@ class BotRunner {
     }
 
     // Message-related nodes need GuildMessages and MessageContent
-    const messageNodes = ['send-message', 'delete-message', 'pin-message', 'create-thread', 'react-emoji'];
+    const messageNodes = ['send-message', 'delete-message', 'pin-message', 'create-thread', 'react-emoji',
+                          'action-send-message', 'action-delete-message', 'action-reply-message'];
     if (messageNodes.some(nodeType => usedNodeTypes.has(nodeType))) {
       intents.push(GatewayIntentBits.GuildMessages);
       intents.push(GatewayIntentBits.MessageContent);
@@ -389,12 +433,10 @@ class BotRunner {
     // Set up commands collection
     this.client.commands = new Collection();
 
-    // Get command events from the events array
-    const commandEvents = (this.config.events || []).filter(event => event.type === 'command');
-
-    // Register commands from events
-    if (commandEvents.length > 0) {
-      await this.registerCommands(commandEvents);
+    // Scan ALL events for ON_SLASH_COMMAND nodes and register them
+    const allEvents = this.config.events || [];
+    if (allEvents.length > 0) {
+      await this.registerCommands(allEvents);
     }
 
     // Set up event handlers
@@ -410,44 +452,126 @@ class BotRunner {
     }
   }
 
-  async registerCommands(commandEvents) {
-    const commands = commandEvents.map(cmd => {
-      const command = {
-        name: cmd.name,
-        description: cmd.description || 'No description provided',
-      };
+  async registerCommands(allEvents) {
+    const { isBlueprintEvent, extractCommandConfiguration } = require('./blueprintExecutor');
 
-      // Add command options if they exist
-      if (cmd.options && cmd.options.length > 0) {
-        command.options = cmd.options.map(opt => {
-          const option = {
-            name: opt.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_'), // Discord requires lowercase alphanumeric
-            description: opt.description || `${opt.name} parameter`,
-            required: opt.required || false,
-          };
+    this.log('info', `Scanning ${allEvents.length} events for slash commands...`);
 
-          // Map our types to Discord's ApplicationCommandOptionType
-          const typeMap = {
-            'STRING': 3,
-            'NUMBER': 10,
-            'BOOLEAN': 5,
-            'USER': 6,
-            'CHANNEL': 7,
-            'ROLE': 8,
-            'ATTACHMENT': 11,
-          };
+    const commands = [];
+    const commandEventMap = new Map(); // Map command names to events for execution
 
-          option.type = typeMap[opt.type] || 3; // Default to STRING
-          return option;
-        });
+    // Scan all events for ON_SLASH_COMMAND nodes
+    allEvents.forEach(event => {
+      if (!isBlueprintEvent(event) || !event.flowData || !event.flowData.nodes) {
+        return;
       }
 
-      return command;
+      // Find all ON_SLASH_COMMAND nodes in this event
+      const commandNodes = event.flowData.nodes.filter(node =>
+        node.type === 'blueprintNode' &&
+        node.data?.definitionId &&
+        (node.data.definitionId === 'event-slash-command' || node.data.definitionId === 'ON_SLASH_COMMAND')
+      );
+
+      if (commandNodes.length === 0) {
+        return;
+      }
+
+      this.log('info', `Found ${commandNodes.length} command node(s) in event "${event.name}"`);
+
+      // Process each command node
+      commandNodes.forEach(commandNode => {
+        const commandName = commandNode.data?.config?.commandName;
+        const commandDescription = commandNode.data?.config?.commandDescription || 'A slash command';
+
+        if (!commandName || commandName.trim() === '') {
+          this.log('warning', `ON_SLASH_COMMAND node in "${event.name}" is missing command name - skipping`);
+          return;
+        }
+
+        this.log('info', `Registering command: /${commandName}`);
+
+        // Find all option nodes in this event
+        const optionNodes = event.flowData.nodes.filter(node =>
+          node.type === 'blueprintNode' &&
+          node.data?.definitionId &&
+          (node.data.definitionId.startsWith('OPTION_') || node.data.definitionId.startsWith('pure-option-'))
+        );
+
+        // Build command structure for Discord
+        const command = {
+          name: commandName.toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+          description: commandDescription,
+        };
+
+        // Add options if any
+        if (optionNodes.length > 0) {
+          command.options = optionNodes.map(optionNode => {
+            const optionDef = optionNode.data?.definitionId;
+            const config = optionNode.data?.config || {};
+
+            const typeMapping = {
+              'OPTION_STRING': 'STRING',
+              'OPTION_NUMBER': 'NUMBER',
+              'OPTION_BOOLEAN': 'BOOLEAN',
+              'OPTION_USER': 'USER',
+              'OPTION_CHANNEL': 'CHANNEL',
+              'OPTION_ROLE': 'ROLE',
+              'OPTION_ATTACHMENT': 'ATTACHMENT',
+              'pure-option-string': 'STRING',
+              'pure-option-number': 'NUMBER',
+              'pure-option-boolean': 'BOOLEAN',
+              'pure-option-user': 'USER',
+              'pure-option-channel': 'CHANNEL',
+              'pure-option-role': 'ROLE',
+              'pure-option-attachment': 'ATTACHMENT',
+            };
+
+            const typeMap = {
+              'STRING': 3,
+              'NUMBER': 10,
+              'BOOLEAN': 5,
+              'USER': 6,
+              'CHANNEL': 7,
+              'ROLE': 8,
+              'ATTACHMENT': 11,
+            };
+
+            const optionType = typeMapping[optionDef] || 'STRING';
+
+            return {
+              name: (config.optionName || 'option').toLowerCase().replace(/[^a-z0-9_-]/g, '_'),
+              description: config.description || 'An option',
+              required: config.required || false,
+              type: typeMap[optionType] || 3,
+            };
+          }).filter(opt => opt.name !== 'option'); // Filter unconfigured options
+
+          if (command.options.length > 0) {
+            this.log('info', `  - ${command.options.length} option(s): ${command.options.map(o => o.name).join(', ')}`);
+          }
+        }
+
+        commands.push(command);
+
+        // Store the event AND command options for this command so we can execute it later
+        commandEventMap.set(command.name, {
+          ...event,
+          options: command.options,  // Include the options array
+          commandName: command.name,
+          commandDescription: command.description,
+        });
+      });
     });
 
-    // Store commands in the client
-    commandEvents.forEach(cmd => {
-      this.client.commands.set(cmd.name, cmd);
+    if (commands.length === 0) {
+      this.log('info', 'No slash commands found in events');
+      return;
+    }
+
+    // Store command events in client for execution
+    commandEventMap.forEach((event, commandName) => {
+      this.client.commands.set(commandName, event);
     });
 
     // Register slash commands with Discord
@@ -457,26 +581,33 @@ class BotRunner {
 
         if (this.config.guildId) {
           // Register to specific guild (instant update)
+          this.log('info', `Registering ${commands.length} command(s) to guild ${this.config.guildId}...`);
           await rest.put(
             Routes.applicationGuildCommands(this.config.applicationId, this.config.guildId),
             { body: commands }
           );
-          this.log('info', `Registered ${commands.length} guild commands`);
+          this.log('success', `✅ Registered ${commands.length} guild command(s): ${commands.map(c => '/' + c.name).join(', ')}`);
         } else {
           // Register globally (takes up to 1 hour)
+          this.log('info', `Registering ${commands.length} command(s) globally...`);
           await rest.put(
             Routes.applicationCommands(this.config.applicationId),
             { body: commands }
           );
-          this.log('info', `Registered ${commands.length} global commands`);
+          this.log('success', `✅ Registered ${commands.length} global command(s): ${commands.map(c => '/' + c.name).join(', ')}`);
+          this.log('warning', 'Global commands can take up to 1 hour to update');
         }
       } catch (error) {
         this.log('error', `Failed to register commands: ${error.message}`);
       }
+    } else {
+      this.log('warning', `Found ${commands.length} command(s) but Application ID is not set - commands will not be registered`);
     }
   }
 
   setupEventHandlers() {
+    const { isBlueprintEvent, executeBlueprintEvent, findEventNode } = require('./blueprintExecutor');
+
     this.client.once('ready', () => {
       this.log('success', `Bot is online as ${this.client.user.tag}`);
       this.log('info', `Serving ${this.client.guilds.cache.size} servers`);
@@ -505,14 +636,26 @@ class BotRunner {
       }
     });
 
-    // Register Discord event triggers
-    const eventTriggers = (this.config.events || []).filter(event => event.type === 'event');
-    eventTriggers.forEach(eventTrigger => {
+    // Register all events (blueprint and legacy)
+    const allEvents = this.config.events || [];
+
+    // Separate blueprint events from legacy events
+    const blueprintEvents = allEvents.filter(event => isBlueprintEvent(event));
+    const legacyEvents = allEvents.filter(event => !isBlueprintEvent(event));
+
+    // Register blueprint events
+    blueprintEvents.forEach(event => {
+      this.registerBlueprintEvent(event);
+    });
+
+    // Register legacy event triggers
+    const legacyEventTriggers = legacyEvents.filter(event => event.type === 'event');
+    legacyEventTriggers.forEach(eventTrigger => {
       this.registerEventTrigger(eventTrigger);
     });
 
     // Register Anti-Hack triggers
-    const antiHackTriggers = (this.config.events || []).filter(event => event.type === 'anti-hack');
+    const antiHackTriggers = legacyEvents.filter(event => event.type === 'anti-hack');
     if (antiHackTriggers.length > 0) {
       this.registerAntiHackTriggers(antiHackTriggers);
     }
@@ -523,6 +666,200 @@ class BotRunner {
 
     this.client.on('disconnect', () => {
       this.log('info', 'Bot disconnected');
+    });
+  }
+
+  registerBlueprintEvent(event) {
+    const { executeBlueprintEvent, findEventNode } = require('./blueprintExecutor');
+
+    if (!event.flowData || !event.flowData.nodes) {
+      this.log('warning', `Blueprint event "${event.name}" has no nodes`);
+      return;
+    }
+
+    // Find which event nodes are in this blueprint
+    const eventNodes = event.flowData.nodes.filter(node =>
+      node.type === 'blueprintNode' &&
+      node.data?.definitionId &&
+      (node.data.definitionId.startsWith('event-') || node.data.definitionId.startsWith('ON_') || node.data.definitionId.includes('EVENT'))
+    );
+
+    if (eventNodes.length === 0) {
+      this.log('warning', `Blueprint event "${event.name}" has no event trigger nodes`);
+      return;
+    }
+
+    // Register handlers for each event type found
+    eventNodes.forEach(eventNode => {
+      const eventType = eventNode.data.definitionId;
+
+      switch (eventType) {
+        case 'event-message-created':
+        case 'ON_MESSAGE_CREATED':
+          this.client.on('messageCreate', async (message) => {
+            if (message.author.bot) return; // Ignore bot messages
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageCreate`);
+              await executeBlueprintEvent('messageCreate', { message }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for messageCreate`);
+          break;
+
+        case 'event-message-deleted':
+        case 'ON_MESSAGE_DELETED':
+          this.client.on('messageDelete', async (message) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageDelete`);
+              await executeBlueprintEvent('messageDelete', { message }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for messageDelete`);
+          break;
+
+        case 'event-message-updated':
+        case 'ON_MESSAGE_UPDATED':
+          this.client.on('messageUpdate', async (oldMessage, newMessage) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageUpdate`);
+              await executeBlueprintEvent('messageUpdate', { oldMessage, newMessage }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for messageUpdate`);
+          break;
+
+        case 'event-member-join':
+        case 'ON_MEMBER_JOINED':
+          this.client.on('guildMemberAdd', async (member) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for guildMemberAdd`);
+              await executeBlueprintEvent('guildMemberAdd', { member }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for guildMemberAdd`);
+          break;
+
+        case 'event-member-leave':
+        case 'ON_MEMBER_LEFT':
+          this.client.on('guildMemberRemove', async (member) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for guildMemberRemove`);
+              await executeBlueprintEvent('guildMemberRemove', { member }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for guildMemberRemove`);
+          break;
+
+        case 'event-reaction-add':
+        case 'ON_REACTION_ADDED':
+          this.client.on('messageReactionAdd', async (reaction, user) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageReactionAdd`);
+              await executeBlueprintEvent('messageReactionAdd', { reaction, user }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for messageReactionAdd`);
+          break;
+
+        case 'event-reaction-remove':
+        case 'ON_REACTION_REMOVED':
+          this.client.on('messageReactionRemove', async (reaction, user) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for messageReactionRemove`);
+              await executeBlueprintEvent('messageReactionRemove', { reaction, user }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for messageReactionRemove`);
+          break;
+
+        case 'event-voice-state-update':
+        case 'ON_VOICE_STATE_CHANGED':
+          this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for voiceStateUpdate`);
+              await executeBlueprintEvent('voiceStateUpdate', { oldState, newState }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for voiceStateUpdate`);
+          break;
+
+        case 'event-voice-join':
+          this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            // Detect join: was not in a channel, now is in a channel
+            if (!oldState.channel && newState.channel) {
+              try {
+                this.log('info', `Executing blueprint event "${event.name}" for voice join`);
+                await executeBlueprintEvent('voiceJoin', {
+                  member: newState.member,
+                  channel: newState.channel,
+                  guild: newState.guild,
+                }, event, this);
+              } catch (error) {
+                this.log('error', `Blueprint event error: ${error.message}`);
+              }
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for voice join`);
+          break;
+
+        case 'event-voice-leave':
+          this.client.on('voiceStateUpdate', async (oldState, newState) => {
+            // Detect leave: was in a channel, now is not in a channel
+            if (oldState.channel && !newState.channel) {
+              try {
+                this.log('info', `Executing blueprint event "${event.name}" for voice leave`);
+                await executeBlueprintEvent('voiceLeave', {
+                  member: oldState.member,
+                  channel: oldState.channel,
+                  guild: oldState.guild,
+                }, event, this);
+              } catch (error) {
+                this.log('error', `Blueprint event error: ${error.message}`);
+              }
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for voice leave`);
+          break;
+
+        case 'event-slash-command':
+        case 'ON_SLASH_COMMAND':
+          // Slash commands are handled separately via command registration
+          // This event node is just for the flow, not for triggering
+          break;
+
+        case 'event-bot-ready':
+        case 'ON_BOT_READY':
+          // Bot ready events are one-time, handled differently
+          this.client.once('ready', async (client) => {
+            try {
+              this.log('info', `Executing blueprint event "${event.name}" for ready`);
+              await executeBlueprintEvent('ready', { client }, event, this);
+            } catch (error) {
+              this.log('error', `Blueprint event error: ${error.message}`);
+            }
+          });
+          this.log('info', `Registered blueprint event: ${event.name} for ready`);
+          break;
+
+        default:
+          this.log('warning', `Unknown blueprint event type: ${eventType}`);
+      }
     });
   }
 
@@ -923,7 +1260,21 @@ class BotRunner {
   }
 
   async executeCommand(interaction, command) {
-    // Execute graph-based command flow with data flow support
+    const { isBlueprintEvent, executeBlueprintCommand } = require('./blueprintExecutor');
+
+    // Check if this is a blueprint command
+    if (isBlueprintEvent(command)) {
+      try {
+        this.log('info', `Executing blueprint command: ${command.name}`);
+        await executeBlueprintCommand(interaction, command, this);
+        return;
+      } catch (error) {
+        this.log('error', `Blueprint command error: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // Legacy flow execution below
     const flowData = command.flowData;
 
     if (!flowData || !flowData.nodes || flowData.nodes.length === 0) {
@@ -2395,6 +2746,157 @@ class BotRunner {
     }
 
     return output; // Return computed values
+  }
+
+  // ============================================================================
+  // Voice Channel Methods
+  // ============================================================================
+
+  async joinVoiceChannel(channel) {
+    if (!voiceModule) {
+      throw new Error('Voice support not available');
+    }
+
+    const { joinVoiceChannel } = voiceModule;
+    const guildId = channel.guild.id;
+
+    try {
+      // Check if already connected
+      if (this.voiceConnections.has(guildId)) {
+        const existingConnection = this.voiceConnections.get(guildId);
+        if (existingConnection.joinConfig.channelId === channel.id) {
+          this.log('info', `Already connected to voice channel ${channel.name}`);
+          return existingConnection;
+        }
+        // Leave current channel if different
+        existingConnection.destroy();
+      }
+
+      this.log('info', `Joining voice channel: ${channel.name}`);
+
+      const connection = joinVoiceChannel({
+        channelId: channel.id,
+        guildId: guildId,
+        adapterCreator: channel.guild.voiceAdapterCreator,
+      });
+
+      this.voiceConnections.set(guildId, connection);
+      this.log('success', `Joined voice channel: ${channel.name}`);
+
+      return connection;
+    } catch (error) {
+      this.log('error', `Failed to join voice channel: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async leaveVoiceChannel(guildId) {
+    if (!this.voiceConnections.has(guildId)) {
+      this.log('warning', 'Not connected to any voice channel in this guild');
+      return;
+    }
+
+    try {
+      const connection = this.voiceConnections.get(guildId);
+
+      // Stop audio if playing
+      if (this.audioPlayers.has(guildId)) {
+        const player = this.audioPlayers.get(guildId);
+        player.stop();
+        this.audioPlayers.delete(guildId);
+      }
+
+      connection.destroy();
+      this.voiceConnections.delete(guildId);
+
+      this.log('success', 'Left voice channel');
+    } catch (error) {
+      this.log('error', `Failed to leave voice channel: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async playSound(channel, filePath, volume = 1.0, callbacks = {}) {
+    if (!voiceModule) {
+      throw new Error('Voice support not available');
+    }
+
+    const { createAudioResource, createAudioPlayer, AudioPlayerStatus } = voiceModule;
+    const guildId = channel.guild.id;
+
+    try {
+      // Join voice channel if not already connected
+      let connection = this.voiceConnections.get(guildId);
+      if (!connection || connection.joinConfig.channelId !== channel.id) {
+        connection = await this.joinVoiceChannel(channel);
+      }
+
+      this.log('info', `Playing sound: ${filePath}`);
+
+      // Create audio resource with volume
+      const resource = createAudioResource(filePath, {
+        inlineVolume: true,
+      });
+
+      if (resource.volume) {
+        resource.volume.setVolume(Math.max(0, Math.min(2, volume)));
+      }
+
+      // Create or reuse audio player
+      let player = this.audioPlayers.get(guildId);
+      if (!player) {
+        player = createAudioPlayer();
+        this.audioPlayers.set(guildId, player);
+
+        // Set up player event listeners
+        player.on(AudioPlayerStatus.Playing, () => {
+          this.log('info', 'Audio playback started');
+          if (callbacks.onStart) {
+            callbacks.onStart().catch(err => {
+              this.log('error', `onStart callback error: ${err.message}`);
+            });
+          }
+        });
+
+        player.on(AudioPlayerStatus.Idle, () => {
+          this.log('info', 'Audio playback ended');
+          if (callbacks.onEnd) {
+            callbacks.onEnd().catch(err => {
+              this.log('error', `onEnd callback error: ${err.message}`);
+            });
+          }
+        });
+
+        player.on('error', (error) => {
+          this.log('error', `Audio player error: ${error.message}`);
+        });
+      }
+
+      // Play the resource
+      player.play(resource);
+      connection.subscribe(player);
+
+      this.log('success', 'Sound playback started');
+    } catch (error) {
+      this.log('error', `Failed to play sound: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async stopSound(guildId) {
+    if (!this.audioPlayers.has(guildId)) {
+      this.log('warning', 'No audio playing in this guild');
+      return;
+    }
+
+    try {
+      const player = this.audioPlayers.get(guildId);
+      player.stop();
+      this.log('success', 'Stopped audio playback');
+    } catch (error) {
+      this.log('error', `Failed to stop audio: ${error.message}`);
+      throw error;
+    }
   }
 
   stop() {
