@@ -20,7 +20,7 @@ const EVENT_MODES = [
   },
 ];
 
-function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
+function EventBuilder({ events, aiConfigs = [], onAddEvent, onUpdateEvent, onDeleteEvent }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [showFlowEditor, setShowFlowEditor] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
@@ -204,6 +204,7 @@ function EventBuilder({ events, onAddEvent, onUpdateEvent, onDeleteEvent }) {
           initialEdges={editingIndex !== null ? events[editingIndex]?.flowData?.edges || [] : []}
           eventName={eventName}
           eventDescription={eventDescription}
+          aiConfigs={aiConfigs}
           onOpenSettings={() => setShowSettings(true)}
           onSave={(flowData) => {
             const event = editingIndex !== null ? events[editingIndex] : {

@@ -18,8 +18,14 @@ const nodeTypes = {
   blueprintNode: BlueprintNode,
 };
 
-const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '', eventDescription = '', onSave, onClose, onOpenSettings }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '', eventDescription = '', aiConfigs = [], onSave, onClose, onOpenSettings }) => {
+  // Add aiConfigs to existing nodes when loading
+  const nodesWithAI = initialNodes.map(node => ({
+    ...node,
+    data: { ...node.data, aiConfigs }
+  }));
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(nodesWithAI);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNodePalette, setShowNodePalette] = useState(false);
@@ -160,13 +166,16 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
           hasConfig: definition.hasConfig,
           defaultConfig: definition.defaultConfig,
           config: definition.defaultConfig ? { ...definition.defaultConfig } : {},
+          requiresAI: definition.requiresAI,
+          aiConfigs: aiConfigs,
+          onConfigChange: (newConfig) => handleConfigChange(newNode.id, newConfig),
         },
       };
 
       setNodes((nds) => [...nds, newNode]);
       setShowNodePalette(false);
     },
-    [setNodes]
+    [setNodes, aiConfigs, handleConfigChange]
   );
 
   // Save blueprint

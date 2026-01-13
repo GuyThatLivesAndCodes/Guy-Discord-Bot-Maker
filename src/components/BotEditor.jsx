@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import BotConfig from './BotConfig';
+import AIManager from './AIManager';
 import EventBuilder from './EventBuilder';
 import './BotEditor.css';
 
@@ -67,6 +68,12 @@ function BotEditor({ bot, isRunning, onUpdateBot, onStartBot, onStopBot, onBack 
           Configuration
         </button>
         <button
+          className={`tab ${activeTab === 'ai' ? 'active' : ''}`}
+          onClick={() => setActiveTab('ai')}
+        >
+          AI
+        </button>
+        <button
           className={`tab ${activeTab === 'events' ? 'active' : ''}`}
           onClick={() => setActiveTab('events')}
         >
@@ -83,9 +90,17 @@ function BotEditor({ bot, isRunning, onUpdateBot, onStartBot, onStopBot, onBack 
           />
         )}
 
+        {activeTab === 'ai' && (
+          <AIManager
+            aiConfigs={bot.aiConfigs || []}
+            onUpdateAIConfigs={(aiConfigs) => onUpdateBot({ aiConfigs })}
+          />
+        )}
+
         {activeTab === 'events' && (
           <EventBuilder
             events={bot.events || []}
+            aiConfigs={bot.aiConfigs || []}
             onAddEvent={addEvent}
             onUpdateEvent={updateEvent}
             onDeleteEvent={deleteEvent}

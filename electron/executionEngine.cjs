@@ -245,7 +245,7 @@ async function executeActionNode(node, definitionId, flowData, context) {
   if (log) {
     log('info', `[EE] Calling executeAction...`);
   }
-  const outputs = await executeAction(definitionId, inputs, context);
+  const outputs = await executeAction(definitionId, inputs, context, node);
 
   if (log) {
     log('info', `[EE] Action completed, outputs: ${outputs ? 'yes' : 'none'}`);
@@ -703,7 +703,7 @@ function computePureNode(nodeId, inputs, context) {
 /**
  * Execute an action
  */
-async function executeAction(actionId, inputs, context) {
+async function executeAction(actionId, inputs, context, node) {
   console.log('[ExecutionEngine] executeAction called:', actionId);
   console.log('[ExecutionEngine] Inputs:', Object.keys(inputs));
 
@@ -1012,15 +1012,24 @@ async function executeAction(actionId, inputs, context) {
       case 'action-claude-api': {
         console.log('[ExecutionEngine] Executing action-claude-api');
 
-        const apiKey = inputs.apiKey;
+        // Get AI config ID from node config
+        const aiConfigId = node?.data?.config?.aiConfigId;
         const prompt = inputs.prompt;
-        const messageCount = inputs.messageCount || 10;
-        const systemPrompt = inputs.systemPrompt || '';
         const channel = inputs.channel;
+        const messageCountOverride = inputs.messageCount;
 
-        if (!apiKey) {
-          console.error('[Blueprint] Missing API key for Claude API call');
-          return { response: '', error: 'API key is required' };
+        if (!aiConfigId) {
+          console.error('[Blueprint] No AI configuration selected');
+          return { response: '', error: 'No AI configuration selected. Please select an AI in the node settings.' };
+        }
+
+        // Find the AI config
+        const aiConfigs = context.aiConfigs || [];
+        const aiConfig = aiConfigs.find(cfg => cfg.id === aiConfigId);
+
+        if (!aiConfig) {
+          console.error('[Blueprint] AI configuration not found:', aiConfigId);
+          return { response: '', error: 'Selected AI configuration not found. Please check your AI settings.' };
         }
 
         if (!prompt) {
@@ -1029,6 +1038,11 @@ async function executeAction(actionId, inputs, context) {
         }
 
         try {
+          // Use messageCount from input override or node config or AI config
+          const messageCount = messageCountOverride !== undefined
+            ? messageCountOverride
+            : (node?.data?.config?.messageCount || 10);
+
           // Build messages array with conversation history
           const messages = [];
 
@@ -1061,16 +1075,21 @@ async function executeAction(actionId, inputs, context) {
             content: prompt
           });
 
-          // Build request body
+          // Build request body using AI config settings
           const requestBody = {
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 4096,
+            model: aiConfig.model || 'claude-3-5-sonnet-20241022',
+            max_tokens: aiConfig.maxTokens || 4096,
             messages: messages
           };
 
-          // Add system prompt if provided
-          if (systemPrompt) {
-            requestBody.system = systemPrompt;
+          // Add temperature if specified
+          if (aiConfig.temperature !== undefined) {
+            requestBody.temperature = aiConfig.temperature;
+          }
+
+          // Add system prompt from AI config if provided
+          if (aiConfig.systemPrompt) {
+            requestBody.system = aiConfig.systemPrompt;
           }
 
           // Make API call using https
@@ -1083,7 +1102,7 @@ async function executeAction(actionId, inputs, context) {
             path: '/v1/messages',
             method: 'POST',
             headers: {
-              'x-api-key': apiKey,
+              'x-api-key': aiConfig.apiKey,
               'anthropic-version': '2023-06-01',
               'content-type': 'application/json',
               'Content-Length': Buffer.byteLength(postData)
