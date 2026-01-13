@@ -1009,6 +1009,130 @@ async function executeAction(actionId, inputs, context) {
         return {};
       }
 
+      case 'action-claude-api': {
+        console.log('[ExecutionEngine] Executing action-claude-api');
+
+        const apiKey = inputs.apiKey;
+        const prompt = inputs.prompt;
+        const messageCount = inputs.messageCount || 10;
+        const systemPrompt = inputs.systemPrompt || '';
+        const channel = inputs.channel;
+
+        if (!apiKey) {
+          console.error('[Blueprint] Missing API key for Claude API call');
+          return { response: '', error: 'API key is required' };
+        }
+
+        if (!prompt) {
+          console.error('[Blueprint] Missing prompt for Claude API call');
+          return { response: '', error: 'Prompt is required' };
+        }
+
+        try {
+          // Build messages array with conversation history
+          const messages = [];
+
+          // Fetch previous messages if channel is provided and messageCount > 0
+          if (channel && messageCount > 0) {
+            try {
+              console.log(`[Claude API] Fetching ${messageCount} previous messages`);
+              const fetchedMessages = await channel.messages.fetch({ limit: messageCount });
+              const messageArray = Array.from(fetchedMessages.values()).reverse();
+
+              // Add messages to context
+              for (const msg of messageArray) {
+                if (msg.content) {
+                  messages.push({
+                    role: msg.author.bot ? 'assistant' : 'user',
+                    content: msg.content
+                  });
+                }
+              }
+              console.log(`[Claude API] Added ${messages.length} messages to context`);
+            } catch (fetchError) {
+              console.warn(`[Claude API] Could not fetch messages: ${fetchError.message}`);
+              // Continue without previous messages
+            }
+          }
+
+          // Add the current prompt
+          messages.push({
+            role: 'user',
+            content: prompt
+          });
+
+          // Build request body
+          const requestBody = {
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 4096,
+            messages: messages
+          };
+
+          // Add system prompt if provided
+          if (systemPrompt) {
+            requestBody.system = systemPrompt;
+          }
+
+          // Make API call using https
+          const https = require('https');
+          const postData = JSON.stringify(requestBody);
+
+          const options = {
+            hostname: 'api.anthropic.com',
+            port: 443,
+            path: '/v1/messages',
+            method: 'POST',
+            headers: {
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+              'Content-Length': Buffer.byteLength(postData)
+            }
+          };
+
+          const response = await new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+              let data = '';
+              res.on('data', (chunk) => {
+                data += chunk;
+              });
+              res.on('end', () => {
+                try {
+                  const parsedResponse = JSON.parse(data);
+                  if (parsedResponse.error) {
+                    reject(new Error(parsedResponse.error.message || 'Claude API error'));
+                  } else {
+                    resolve(parsedResponse);
+                  }
+                } catch (error) {
+                  reject(new Error('Failed to parse Claude API response: ' + error.message));
+                }
+              });
+            });
+
+            req.on('error', (error) => {
+              reject(new Error('Claude API request failed: ' + error.message));
+            });
+
+            req.write(postData);
+            req.end();
+          });
+
+          // Extract response text
+          if (response.content && response.content.length > 0) {
+            const responseText = response.content[0].text;
+            console.log('[Claude API] Success, response length:', responseText.length);
+            return { response: responseText, error: '' };
+          } else {
+            console.warn('[Claude API] No content in response');
+            return { response: '', error: 'No response from Claude API' };
+          }
+        } catch (error) {
+          console.error('[Claude API] Error:', error.message);
+          return { response: '', error: error.message };
+        }
+      }
+
       default:
         console.warn('[Blueprint] Unknown action:', actionId);
         return null;

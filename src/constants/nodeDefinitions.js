@@ -344,6 +344,32 @@ export const ActionNodes = {
     ],
     dataOutputs: [],
   },
+
+  CLAUDE_API_CALL: {
+    id: 'action-claude-api',
+    category: NodeCategory.ACTION,
+    label: 'Claude API Call',
+    description: 'Ask Claude AI with conversation context from Discord messages',
+    icon: '🤖',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [
+      { id: 'apiKey', label: 'API Key', type: PinTypes.STRING, optional: false },
+      { id: 'prompt', label: 'Prompt', type: PinTypes.STRING, optional: false },
+      { id: 'channel', label: 'Channel', type: PinTypes.CHANNEL, optional: true },
+      { id: 'messageCount', label: 'Message Count', type: PinTypes.NUMBER, optional: true },
+      { id: 'systemPrompt', label: 'System Prompt', type: PinTypes.STRING, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'response', label: 'Response', type: PinTypes.STRING },
+      { id: 'error', label: 'Error', type: PinTypes.STRING },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      messageCount: 10,
+      systemPrompt: '',
+    },
+  },
 };
 
 // ============================================================================
