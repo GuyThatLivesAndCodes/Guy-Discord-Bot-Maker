@@ -130,7 +130,8 @@ function createEventContext(eventType, eventData) {
         if (options.data && Array.isArray(options.data)) {
           options.data.forEach((opt) => {
             // Store option values for option nodes to access
-            context[`option_${opt.name}`] = opt.value || opt.user || opt.channel || opt.role;
+            // Priority: channel/user/role objects first (they have full object data), then value (for strings/numbers)
+            context[`option_${opt.name}`] = opt.channel || opt.user || opt.role || opt.value;
           });
         }
       }
@@ -254,67 +255,8 @@ async function executeBlueprintCommand(interaction, command, client) {
     return;
   }
 
-  // Create context
+  // Create context (this already handles options via createEventContext)
   const context = createEventContext('interactionCreate', { interaction });
-
-  // Add command options to event node outputs
-  client.log('info', `[BP] Command has options: ${command.options ? command.options.length : 0}`);
-  if (command.options) {
-    client.log('info', `[BP] Command options: ${JSON.stringify(command.options)}`);
-  }
-  client.log('info', `[BP] Interaction options: ${JSON.stringify(interaction.options.data)}`);
-
-  if (command.options && command.options.length > 0) {
-    command.options.forEach((opt) => {
-      client.log('info', `[BP] Processing option: ${opt.name}, type: ${opt.type}`);
-      let value;
-
-      // Extract value based on option type
-      // Discord.js ApplicationCommandOptionType: 3=STRING, 4=INTEGER, 5=BOOLEAN, 6=USER, 7=CHANNEL, 8=ROLE, 10=NUMBER
-      switch (opt.type) {
-        case 7: // CHANNEL
-          value = interaction.options.getChannel(opt.name);
-          client.log('info', `[BP] Extracted channel: ${value ? value.name : 'null'}`);
-          break;
-        case 6: // USER
-          value = interaction.options.getUser(opt.name);
-          client.log('info', `[BP] Extracted user: ${value ? value.tag : 'null'}`);
-          break;
-        case 8: // ROLE
-          value = interaction.options.getRole(opt.name);
-          client.log('info', `[BP] Extracted role: ${value ? value.name : 'null'}`);
-          break;
-        case 3: // STRING
-          value = interaction.options.getString(opt.name);
-          client.log('info', `[BP] Extracted string: ${value}`);
-          break;
-        case 4: // INTEGER
-        case 10: // NUMBER
-          value = interaction.options.getNumber(opt.name);
-          client.log('info', `[BP] Extracted number: ${value}`);
-          break;
-        case 5: // BOOLEAN
-          value = interaction.options.getBoolean(opt.name);
-          client.log('info', `[BP] Extracted boolean: ${value}`);
-          break;
-        default:
-          // Fallback to generic get
-          value = interaction.options.get(opt.name)?.value;
-          client.log('info', `[BP] Extracted generic: ${value}`);
-      }
-
-      if (value !== undefined && value !== null) {
-        client.log('info', `[BP] Adding to context: ${opt.name}`);
-        context[opt.name] = value;
-      } else {
-        client.log('warning', `[BP] Skipping ${opt.name} - value is undefined/null`);
-      }
-    });
-  } else {
-    client.log('warning', '[BP] No command options to process!');
-  }
-
-  client.log('info', `[BP] Final context keys: ${Object.keys(context).join(', ')}`);
 
   // Execute the flow
   try {

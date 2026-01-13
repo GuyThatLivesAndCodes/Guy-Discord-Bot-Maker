@@ -412,7 +412,7 @@ async function evaluateDataPin(node, targetHandle, flowData, context) {
     const outputId = edge.sourceHandle.replace('data-out-', '');
 
     // Handle option nodes specially - they read from interaction context
-    if (definitionId && definitionId.startsWith('OPTION_')) {
+    if (definitionId && (definitionId.startsWith('OPTION_') || definitionId.startsWith('pure-option-'))) {
       const optionName = sourceNode.data.config.optionName;
       if (!optionName) {
         console.warn('[Blueprint] Option node has no option name configured');
