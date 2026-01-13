@@ -517,12 +517,14 @@ class BotRunner {
               'OPTION_USER': 'USER',
               'OPTION_CHANNEL': 'CHANNEL',
               'OPTION_ROLE': 'ROLE',
+              'OPTION_ATTACHMENT': 'ATTACHMENT',
               'pure-option-string': 'STRING',
               'pure-option-number': 'NUMBER',
               'pure-option-boolean': 'BOOLEAN',
               'pure-option-user': 'USER',
               'pure-option-channel': 'CHANNEL',
               'pure-option-role': 'ROLE',
+              'pure-option-attachment': 'ATTACHMENT',
             };
 
             const typeMap = {
@@ -532,6 +534,7 @@ class BotRunner {
               'USER': 6,
               'CHANNEL': 7,
               'ROLE': 8,
+              'ATTACHMENT': 11,
             };
 
             const optionType = typeMapping[optionDef] || 'STRING';

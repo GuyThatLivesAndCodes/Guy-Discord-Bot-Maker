@@ -639,6 +639,53 @@ function computePureNode(nodeId, inputs, context) {
       }
     }
 
+    // File and attachment operations
+    case 'pure-get-attachment-url': {
+      const attachment = inputs.attachment;
+      return attachment?.url || attachment?.proxyURL || '';
+    }
+    case 'pure-get-attachment-name': {
+      const attachment = inputs.attachment;
+      return attachment?.name || '';
+    }
+    case 'pure-find-files': {
+      const fs = require('fs');
+      const path = require('path');
+      const directory = inputs.directory || node.data?.config?.directory || './audio';
+      const pattern = inputs.pattern || node.data?.config?.pattern || '*';
+      const index = inputs.index !== undefined ? inputs.index : (node.data?.config?.index || 0);
+
+      try {
+        // Read directory
+        const files = fs.readdirSync(directory);
+
+        // Filter by pattern (simple glob matching)
+        const filtered = files.filter(file => {
+          if (pattern === '*') return true;
+          if (pattern.startsWith('*.')) {
+            const ext = pattern.substring(1);
+            return file.endsWith(ext);
+          }
+          return file.includes(pattern);
+        });
+
+        // Get file at index
+        const selectedFile = filtered[index] || '';
+        const fullPath = selectedFile ? path.join(directory, selectedFile) : '';
+
+        return {
+          path: fullPath,
+          count: filtered.length,
+        };
+      } catch (e) {
+        console.error('[ExecutionEngine] Error finding files:', e.message);
+        return {
+          path: '',
+          count: 0,
+        };
+      }
+    }
+
     // Command Options - read values from interaction context
     case 'OPTION_STRING':
     case 'pure-option-string': {

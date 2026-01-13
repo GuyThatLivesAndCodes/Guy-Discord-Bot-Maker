@@ -517,6 +517,28 @@ export const PureNodes = {
     optionType: 'ROLE',
   },
 
+  OPTION_ATTACHMENT: {
+    id: 'pure-option-attachment',
+    category: NodeCategory.PURE,
+    label: 'Attachment Option',
+    description: 'A file upload option for slash commands',
+    icon: '📎',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.ATTACHMENT },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      optionName: '',
+      description: 'A file attachment',
+      required: false,
+    },
+    isCommandOption: true,
+    optionType: 'ATTACHMENT',
+  },
+
   // ============================================================================
   // STRING OPERATIONS
   // ============================================================================
@@ -662,6 +684,67 @@ export const PureNodes = {
     dataOutputs: [
       { id: 'result', label: 'Result', type: PinTypes.NUMBER },
     ],
+  },
+
+  // ============================================================================
+  // FILE & ATTACHMENT OPERATIONS
+  // ============================================================================
+
+  GET_ATTACHMENT_URL: {
+    id: 'pure-get-attachment-url',
+    category: NodeCategory.PURE,
+    label: 'Get Attachment URL',
+    description: 'Extract the download URL from an attachment',
+    icon: '🔗',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'attachment', label: 'Attachment', type: PinTypes.ATTACHMENT, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'url', label: 'URL', type: PinTypes.STRING },
+    ],
+  },
+
+  GET_ATTACHMENT_NAME: {
+    id: 'pure-get-attachment-name',
+    category: NodeCategory.PURE,
+    label: 'Get Attachment Name',
+    description: 'Extract the filename from an attachment',
+    icon: '📝',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'attachment', label: 'Attachment', type: PinTypes.ATTACHMENT, optional: false },
+    ],
+    dataOutputs: [
+      { id: 'name', label: 'Name', type: PinTypes.STRING },
+    ],
+  },
+
+  FIND_FILES: {
+    id: 'pure-find-files',
+    category: NodeCategory.PURE,
+    label: 'Find Files',
+    description: 'Find files in a directory on the server',
+    icon: '🔍',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [
+      { id: 'directory', label: 'Directory', type: PinTypes.STRING, optional: false },
+      { id: 'pattern', label: 'Pattern', type: PinTypes.STRING, optional: true },
+      { id: 'index', label: 'Index', type: PinTypes.NUMBER, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'path', label: 'File Path', type: PinTypes.STRING },
+      { id: 'count', label: 'Count', type: PinTypes.NUMBER },
+    ],
+    hasConfig: true,
+    defaultConfig: {
+      directory: './audio',
+      pattern: '*.mp3',
+      index: 0,
+    },
   },
 
   // ============================================================================

@@ -130,8 +130,8 @@ function createEventContext(eventType, eventData) {
         if (options.data && Array.isArray(options.data)) {
           options.data.forEach((opt) => {
             // Store option values for option nodes to access
-            // Priority: channel/user/role objects first (they have full object data), then value (for strings/numbers)
-            context[`option_${opt.name}`] = opt.channel || opt.user || opt.role || opt.value;
+            // Priority: attachment/channel/user/role objects first (they have full object data), then value (for strings/numbers)
+            context[`option_${opt.name}`] = opt.attachment || opt.channel || opt.user || opt.role || opt.value;
           });
         }
       }
