@@ -258,12 +258,15 @@ async function executeBlueprintCommand(interaction, command, client) {
   const context = createEventContext('interactionCreate', { interaction });
 
   // Add command options to event node outputs
-  console.log('[BP] Command options:', JSON.stringify(command.options, null, 2));
-  console.log('[BP] Interaction options data:', interaction.options.data);
+  client.log('info', `[BP] Command has options: ${command.options ? command.options.length : 0}`);
+  if (command.options) {
+    client.log('info', `[BP] Command options: ${JSON.stringify(command.options)}`);
+  }
+  client.log('info', `[BP] Interaction options: ${JSON.stringify(interaction.options.data)}`);
 
   if (command.options && command.options.length > 0) {
     command.options.forEach((opt) => {
-      console.log(`[BP] Processing option: ${opt.name}, type: ${opt.type}`);
+      client.log('info', `[BP] Processing option: ${opt.name}, type: ${opt.type}`);
       let value;
 
       // Extract value based on option type
@@ -271,45 +274,47 @@ async function executeBlueprintCommand(interaction, command, client) {
       switch (opt.type) {
         case 7: // CHANNEL
           value = interaction.options.getChannel(opt.name);
-          console.log(`[BP] Extracted channel value:`, value);
+          client.log('info', `[BP] Extracted channel: ${value ? value.name : 'null'}`);
           break;
         case 6: // USER
           value = interaction.options.getUser(opt.name);
-          console.log(`[BP] Extracted user value:`, value);
+          client.log('info', `[BP] Extracted user: ${value ? value.tag : 'null'}`);
           break;
         case 8: // ROLE
           value = interaction.options.getRole(opt.name);
-          console.log(`[BP] Extracted role value:`, value);
+          client.log('info', `[BP] Extracted role: ${value ? value.name : 'null'}`);
           break;
         case 3: // STRING
           value = interaction.options.getString(opt.name);
-          console.log(`[BP] Extracted string value:`, value);
+          client.log('info', `[BP] Extracted string: ${value}`);
           break;
         case 4: // INTEGER
         case 10: // NUMBER
           value = interaction.options.getNumber(opt.name);
-          console.log(`[BP] Extracted number value:`, value);
+          client.log('info', `[BP] Extracted number: ${value}`);
           break;
         case 5: // BOOLEAN
           value = interaction.options.getBoolean(opt.name);
-          console.log(`[BP] Extracted boolean value:`, value);
+          client.log('info', `[BP] Extracted boolean: ${value}`);
           break;
         default:
           // Fallback to generic get
           value = interaction.options.get(opt.name)?.value;
-          console.log(`[BP] Extracted generic value:`, value);
+          client.log('info', `[BP] Extracted generic: ${value}`);
       }
 
       if (value !== undefined && value !== null) {
-        console.log(`[BP] Adding to context: ${opt.name} =`, value);
+        client.log('info', `[BP] Adding to context: ${opt.name}`);
         context[opt.name] = value;
       } else {
-        console.log(`[BP] Skipping ${opt.name} - value is undefined/null`);
+        client.log('warning', `[BP] Skipping ${opt.name} - value is undefined/null`);
       }
     });
+  } else {
+    client.log('warning', '[BP] No command options to process!');
   }
 
-  console.log('[BP] Final context keys:', Object.keys(context));
+  client.log('info', `[BP] Final context keys: ${Object.keys(context).join(', ')}`);
 
   // Execute the flow
   try {
