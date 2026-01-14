@@ -1010,7 +1010,8 @@ async function executeAction(actionId, inputs, context, node) {
       }
 
       case 'action-claude-api': {
-        console.log('[ExecutionEngine] Executing action-claude-api');
+        const log = context.client?.log || console.log.bind(console);
+        log('info', '[Claude] Executing Claude API action');
 
         // Get AI config ID from node config
         const aiConfigId = node?.data?.config?.aiConfigId;
@@ -1018,22 +1019,30 @@ async function executeAction(actionId, inputs, context, node) {
         const channel = inputs.channel;
         const messageCountOverride = inputs.messageCount;
 
+        log('info', `[Claude] AI Config ID: ${aiConfigId || 'NONE'}`);
+        log('info', `[Claude] Prompt: ${prompt ? 'provided' : 'MISSING'}`);
+        log('info', `[Claude] Channel: ${channel ? 'provided' : 'none'}`);
+
         if (!aiConfigId) {
-          console.error('[Blueprint] No AI configuration selected');
+          log('error', '[Claude] No AI configuration selected');
           return { response: '', error: 'No AI configuration selected. Please select an AI in the node settings.' };
         }
 
         // Find the AI config
         const aiConfigs = context.aiConfigs || [];
+        log('info', `[Claude] Available AI configs: ${aiConfigs.length}`);
+
         const aiConfig = aiConfigs.find(cfg => cfg.id === aiConfigId);
 
         if (!aiConfig) {
-          console.error('[Blueprint] AI configuration not found:', aiConfigId);
+          log('error', `[Claude] AI configuration not found: ${aiConfigId}`);
           return { response: '', error: 'Selected AI configuration not found. Please check your AI settings.' };
         }
 
+        log('info', `[Claude] Using AI config: ${aiConfig.name}`);
+
         if (!prompt) {
-          console.error('[Blueprint] Missing prompt for Claude API call');
+          log('error', '[Claude] Missing prompt');
           return { response: '', error: 'Prompt is required' };
         }
 
@@ -1043,13 +1052,15 @@ async function executeAction(actionId, inputs, context, node) {
             ? messageCountOverride
             : (node?.data?.config?.messageCount || 10);
 
+          log('info', `[Claude] Message count: ${messageCount}`);
+
           // Build messages array with conversation history
           const messages = [];
 
           // Fetch previous messages if channel is provided and messageCount > 0
           if (channel && messageCount > 0) {
             try {
-              console.log(`[Claude API] Fetching ${messageCount} previous messages`);
+              log('info', `[Claude] Fetching ${messageCount} previous messages`);
               const fetchedMessages = await channel.messages.fetch({ limit: messageCount });
               const messageArray = Array.from(fetchedMessages.values()).reverse();
 
@@ -1062,9 +1073,9 @@ async function executeAction(actionId, inputs, context, node) {
                   });
                 }
               }
-              console.log(`[Claude API] Added ${messages.length} messages to context`);
+              log('info', `[Claude] Added ${messages.length} messages to context`);
             } catch (fetchError) {
-              console.warn(`[Claude API] Could not fetch messages: ${fetchError.message}`);
+              log('warning', `[Claude] Could not fetch messages: ${fetchError.message}`);
               // Continue without previous messages
             }
           }
@@ -1091,6 +1102,8 @@ async function executeAction(actionId, inputs, context, node) {
           if (aiConfig.systemPrompt) {
             requestBody.system = aiConfig.systemPrompt;
           }
+
+          log('info', `[Claude] Making API request (model: ${requestBody.model}, tokens: ${requestBody.max_tokens})`);
 
           // Make API call using https
           const https = require('https');
@@ -1140,14 +1153,14 @@ async function executeAction(actionId, inputs, context, node) {
           // Extract response text
           if (response.content && response.content.length > 0) {
             const responseText = response.content[0].text;
-            console.log('[Claude API] Success, response length:', responseText.length);
+            log('success', `[Claude] Response received (${responseText.length} chars)`);
             return { response: responseText, error: '' };
           } else {
-            console.warn('[Claude API] No content in response');
+            log('warning', '[Claude] No content in response');
             return { response: '', error: 'No response from Claude API' };
           }
         } catch (error) {
-          console.error('[Claude API] Error:', error.message);
+          log('error', `[Claude] API call failed: ${error.message}`);
           return { response: '', error: error.message };
         }
       }
