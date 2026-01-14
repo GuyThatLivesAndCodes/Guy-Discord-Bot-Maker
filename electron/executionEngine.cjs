@@ -1022,38 +1022,38 @@ async function executeAction(actionId, inputs, context, node) {
 
           // Get AI config ID from node config
           const aiConfigId = node?.data?.config?.aiConfigId;
-        const prompt = inputs.prompt;
-        const channel = inputs.channel;
-        const messageCountOverride = inputs.messageCount;
+          const prompt = inputs.prompt;
+          const channel = inputs.channel;
+          const messageCountOverride = inputs.messageCount;
 
-        log('info', `[Claude] AI Config ID: ${aiConfigId || 'NONE'}`);
-        log('info', `[Claude] Prompt: ${prompt ? 'provided' : 'MISSING'}`);
-        log('info', `[Claude] Channel: ${channel ? 'provided' : 'none'}`);
+          log('info', `[Claude] AI Config ID: ${aiConfigId || 'NONE'}`);
+          log('info', `[Claude] Prompt: ${prompt ? 'provided' : 'MISSING'}`);
+          log('info', `[Claude] Channel: ${channel ? 'provided' : 'none'}`);
 
-        if (!aiConfigId) {
-          log('error', '[Claude] No AI configuration selected');
-          return { response: '', error: 'No AI configuration selected. Please select an AI in the node settings.' };
-        }
+          if (!aiConfigId) {
+            log('error', '[Claude] No AI configuration selected');
+            return { response: '', error: 'No AI configuration selected. Please select an AI in the node settings.' };
+          }
 
-        // Find the AI config
-        const aiConfigs = context.aiConfigs || [];
-        log('info', `[Claude] Available AI configs: ${aiConfigs.length}`);
+          // Find the AI config
+          const aiConfigs = context.aiConfigs || [];
+          log('info', `[Claude] Available AI configs: ${aiConfigs.length}`);
 
-        const aiConfig = aiConfigs.find(cfg => cfg.id === aiConfigId);
+          const aiConfig = aiConfigs.find(cfg => cfg.id === aiConfigId);
 
-        if (!aiConfig) {
-          log('error', `[Claude] AI configuration not found: ${aiConfigId}`);
-          return { response: '', error: 'Selected AI configuration not found. Please check your AI settings.' };
-        }
+          if (!aiConfig) {
+            log('error', `[Claude] AI configuration not found: ${aiConfigId}`);
+            return { response: '', error: 'Selected AI configuration not found. Please check your AI settings.' };
+          }
 
-        log('info', `[Claude] Using AI config: ${aiConfig.name}`);
+          log('info', `[Claude] Using AI config: ${aiConfig.name}`);
 
-        if (!prompt) {
-          log('error', '[Claude] Missing prompt');
-          return { response: '', error: 'Prompt is required' };
-        }
+          if (!prompt) {
+            log('error', '[Claude] Missing prompt');
+            return { response: '', error: 'Prompt is required' };
+          }
 
-        try {
+          try {
           // Use messageCount from input override or node config or AI config
           const messageCount = messageCountOverride !== undefined
             ? messageCountOverride
