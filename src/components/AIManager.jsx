@@ -140,7 +140,10 @@ function AIManager({ aiConfigs = [], onUpdateAIConfigs }) {
                 max="1"
                 step="0.1"
                 value={currentAI.temperature}
-                onChange={(e) => updateField('temperature', parseFloat(e.target.value))}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  updateField('temperature', isNaN(val) ? 1.0 : val);
+                }}
               />
               <small>Higher values make output more random, lower values more focused</small>
             </div>
@@ -152,7 +155,10 @@ function AIManager({ aiConfigs = [], onUpdateAIConfigs }) {
                 min="1"
                 max="8192"
                 value={currentAI.maxTokens}
-                onChange={(e) => updateField('maxTokens', parseInt(e.target.value))}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  updateField('maxTokens', isNaN(val) ? 4096 : val);
+                }}
               />
               <small>Maximum length of the response</small>
             </div>

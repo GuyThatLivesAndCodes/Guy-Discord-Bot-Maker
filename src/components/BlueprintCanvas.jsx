@@ -168,21 +168,30 @@ const BlueprintCanvas = ({ initialNodes = [], initialEdges = [], eventName = '',
           config: definition.defaultConfig ? { ...definition.defaultConfig } : {},
           requiresAI: definition.requiresAI,
           aiConfigs: aiConfigs,
-          onConfigChange: (newConfig) => handleConfigChange(newNode.id, newConfig),
         },
       };
 
       setNodes((nds) => [...nds, newNode]);
       setShowNodePalette(false);
     },
-    [setNodes, aiConfigs, handleConfigChange]
+    [setNodes, aiConfigs]
   );
 
   // Save blueprint
   const handleSave = useCallback(() => {
     if (onSave) {
+      // Clean nodes before saving (remove runtime data)
+      const cleanedNodes = nodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          onConfigChange: undefined,
+          aiConfigs: undefined,
+        }
+      }));
+
       onSave({
-        nodes,
+        nodes: cleanedNodes,
         edges,
       });
     }
