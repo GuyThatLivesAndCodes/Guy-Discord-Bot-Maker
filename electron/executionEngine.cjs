@@ -1011,10 +1011,17 @@ async function executeAction(actionId, inputs, context, node) {
 
       case 'action-claude-api': {
         const log = context.client?.log || console.log.bind(console);
-        log('info', '[Claude] Executing Claude API action');
 
-        // Get AI config ID from node config
-        const aiConfigId = node?.data?.config?.aiConfigId;
+        try {
+          log('info', '[Claude] Executing Claude API action');
+
+          // Debug logging
+          log('info', `[Claude] Node exists: ${!!node}`);
+          log('info', `[Claude] Node.data exists: ${!!node?.data}`);
+          log('info', `[Claude] Node.data.config exists: ${!!node?.data?.config}`);
+
+          // Get AI config ID from node config
+          const aiConfigId = node?.data?.config?.aiConfigId;
         const prompt = inputs.prompt;
         const channel = inputs.channel;
         const messageCountOverride = inputs.messageCount;
@@ -1162,6 +1169,11 @@ async function executeAction(actionId, inputs, context, node) {
         } catch (error) {
           log('error', `[Claude] API call failed: ${error.message}`);
           return { response: '', error: error.message };
+        }
+        } catch (error) {
+          log('error', `[Claude] Initialization error: ${error.message}`);
+          log('error', `[Claude] Stack: ${error.stack}`);
+          return { response: '', error: `Setup error: ${error.message}` };
         }
       }
 
