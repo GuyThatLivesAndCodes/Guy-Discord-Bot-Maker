@@ -393,7 +393,7 @@ async function evaluateDataPin(node, targetHandle, flowData, context) {
 
   if (!edge) {
     // No connection - check if it's a constant
-    if (node.data.config) {
+    if (node.data?.config) {
       const pinId = targetHandle.replace('data-in-', '').replace('data-out-', '');
       return node.data.config[pinId];
     }
@@ -407,13 +407,13 @@ async function evaluateDataPin(node, targetHandle, flowData, context) {
   const sourceCategory = getNodeCategory(sourceNode.data?.definitionId);
 
   // If source is a constant node, return config value
-  if (sourceNode.data.hasConfig && sourceNode.data.config) {
+  if (sourceNode.data?.hasConfig && sourceNode.data?.config) {
     const definitionId = sourceNode.data?.definitionId;
     const outputId = edge.sourceHandle.replace('data-out-', '');
 
     // Handle option nodes specially - they read from interaction context
     if (definitionId && (definitionId.startsWith('OPTION_') || definitionId.startsWith('pure-option-'))) {
-      const optionName = sourceNode.data.config.optionName;
+      const optionName = sourceNode.data?.config?.optionName;
       if (!optionName) {
         console.warn('[Blueprint] Option node has no option name configured');
         return undefined;
