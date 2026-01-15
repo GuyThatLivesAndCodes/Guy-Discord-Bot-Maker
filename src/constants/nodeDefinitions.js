@@ -344,6 +344,31 @@ export const ActionNodes = {
     ],
     dataOutputs: [],
   },
+
+  CLAUDE_API_CALL: {
+    id: 'action-claude-api',
+    category: NodeCategory.ACTION,
+    label: 'Claude API Call',
+    description: 'Ask Claude AI with conversation context from Discord messages',
+    icon: '🤖',
+    execInputs: [{ id: 'exec', label: '' }],
+    execOutputs: [{ id: 'exec', label: '' }],
+    dataInputs: [
+      { id: 'prompt', label: 'Prompt', type: PinTypes.STRING, optional: false },
+      { id: 'channel', label: 'Channel', type: PinTypes.CHANNEL, optional: true },
+      { id: 'messageCount', label: 'Message Count', type: PinTypes.NUMBER, optional: true },
+    ],
+    dataOutputs: [
+      { id: 'response', label: 'Response', type: PinTypes.STRING },
+      { id: 'error', label: 'Error', type: PinTypes.STRING },
+    ],
+    hasConfig: true,
+    requiresAI: true,
+    defaultConfig: {
+      aiConfigId: '',
+      messageCount: 10,
+    },
+  },
 };
 
 // ============================================================================
@@ -366,6 +391,22 @@ export const PureNodes = {
     ],
     hasConfig: true,
     defaultConfig: { value: '' },
+  },
+
+  CONSTANT_NUMBER: {
+    id: 'pure-constant-number',
+    category: NodeCategory.PURE,
+    label: 'Number',
+    description: 'A numeric value',
+    icon: '🔢',
+    execInputs: [],
+    execOutputs: [],
+    dataInputs: [],
+    dataOutputs: [
+      { id: 'value', label: 'Value', type: PinTypes.NUMBER },
+    ],
+    hasConfig: true,
+    defaultConfig: { value: 0 },
   },
 
   CONSTANT_BOOLEAN: {

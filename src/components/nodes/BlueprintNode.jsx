@@ -161,13 +161,69 @@ const BlueprintNode = ({ data, selected }) => {
           {data.hasConfig && onConfigChange && (
             <div style={{ margin: '8px 0', padding: '8px', background: '#2b2b2b', borderRadius: '4px' }}>
               {Object.keys(data.defaultConfig || {}).map((key) => {
+                // Special handling for AI config selector
+                if (key === 'aiConfigId') {
+                  const aiConfigs = data.aiConfigs || [];
+                  const hasNoAI = aiConfigs.length === 0;
+
+                  return (
+                    <div key={key} style={{ marginBottom: '6px' }}>
+                      <label style={{
+                        display: 'block',
+                        fontSize: '10px',
+                        color: '#aaa',
+                        marginBottom: '2px',
+                        fontWeight: 'bold'
+                      }}>
+                        AI Configuration
+                      </label>
+                      {hasNoAI ? (
+                        <div style={{
+                          padding: '8px',
+                          background: '#3a2a2a',
+                          border: '1px solid #ff6b6b',
+                          borderRadius: '4px',
+                          fontSize: '10px',
+                          color: '#ff6b6b'
+                        }}>
+                          ⚠️ No AI configured. Go to AI tab to add one.
+                        </div>
+                      ) : (
+                        <select
+                          value={config[key] || ''}
+                          onChange={(e) => {
+                            onConfigChange({ ...config, [key]: e.target.value });
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: '4px 8px',
+                            background: '#1a1a1a',
+                            border: '1px solid #555',
+                            borderRadius: '4px',
+                            color: '#fff',
+                            fontSize: '11px',
+                          }}
+                        >
+                          <option value="">Select AI...</option>
+                          {aiConfigs.map((ai) => (
+                            <option key={ai.id} value={ai.id}>
+                              {ai.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  );
+                }
+
                 const isCheckbox = typeof config[key] === 'boolean' || typeof data.defaultConfig[key] === 'boolean';
                 const fieldLabel = key === 'commandName' ? 'Command' :
                                  key === 'commandDescription' ? 'Cmd Description' :
                                  key === 'optionName' ? 'Option Name' :
                                  key === 'description' ? 'Description' :
                                  key === 'required' ? 'Required?' :
-                                 key === 'value' ? 'Value' : key;
+                                 key === 'value' ? 'Value' :
+                                 key === 'messageCount' ? 'Message Count' : key;
 
                 return (
                   <div key={key} style={{ marginBottom: '6px' }}>

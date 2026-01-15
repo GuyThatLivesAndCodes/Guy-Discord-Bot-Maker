@@ -245,7 +245,7 @@ async function executeActionNode(node, definitionId, flowData, context) {
   if (log) {
     log('info', `[EE] Calling executeAction...`);
   }
-  const outputs = await executeAction(definitionId, inputs, context);
+  const outputs = await executeAction(definitionId, inputs, context, node);
 
   if (log) {
     log('info', `[EE] Action completed, outputs: ${outputs ? 'yes' : 'none'}`);
@@ -703,7 +703,7 @@ function computePureNode(nodeId, inputs, context) {
 /**
  * Execute an action
  */
-async function executeAction(actionId, inputs, context) {
+async function executeAction(actionId, inputs, context, node) {
   console.log('[ExecutionEngine] executeAction called:', actionId);
   console.log('[ExecutionEngine] Inputs:', Object.keys(inputs));
 
@@ -1007,6 +1007,174 @@ async function executeAction(actionId, inputs, context) {
           await botClient.stopSound(guild.id);
         }
         return {};
+      }
+
+      case 'action-claude-api': {
+        const log = context.client?.log || console.log.bind(console);
+
+        try {
+          log('info', '[Claude] Executing Claude API action');
+
+          // Debug logging
+          log('info', `[Claude] Node exists: ${!!node}`);
+          log('info', `[Claude] Node.data exists: ${!!node?.data}`);
+          log('info', `[Claude] Node.data.config exists: ${!!node?.data?.config}`);
+
+          // Get AI config ID from node config
+          const aiConfigId = node?.data?.config?.aiConfigId;
+          const prompt = inputs.prompt;
+          const channel = inputs.channel;
+          const messageCountOverride = inputs.messageCount;
+
+          log('info', `[Claude] AI Config ID: ${aiConfigId || 'NONE'}`);
+          log('info', `[Claude] Prompt: ${prompt ? 'provided' : 'MISSING'}`);
+          log('info', `[Claude] Channel: ${channel ? 'provided' : 'none'}`);
+
+          if (!aiConfigId) {
+            log('error', '[Claude] No AI configuration selected');
+            return { response: '', error: 'No AI configuration selected. Please select an AI in the node settings.' };
+          }
+
+          // Find the AI config
+          const aiConfigs = context.aiConfigs || [];
+          log('info', `[Claude] Available AI configs: ${aiConfigs.length}`);
+
+          const aiConfig = aiConfigs.find(cfg => cfg.id === aiConfigId);
+
+          if (!aiConfig) {
+            log('error', `[Claude] AI configuration not found: ${aiConfigId}`);
+            return { response: '', error: 'Selected AI configuration not found. Please check your AI settings.' };
+          }
+
+          log('info', `[Claude] Using AI config: ${aiConfig.name}`);
+
+          if (!prompt) {
+            log('error', '[Claude] Missing prompt');
+            return { response: '', error: 'Prompt is required' };
+          }
+
+          try {
+          // Use messageCount from input override or node config or AI config
+          const messageCount = messageCountOverride !== undefined
+            ? messageCountOverride
+            : (node?.data?.config?.messageCount || 10);
+
+          log('info', `[Claude] Message count: ${messageCount}`);
+
+          // Build messages array with conversation history
+          const messages = [];
+
+          // Fetch previous messages if channel is provided and messageCount > 0
+          if (channel && messageCount > 0) {
+            try {
+              log('info', `[Claude] Fetching ${messageCount} previous messages`);
+              const fetchedMessages = await channel.messages.fetch({ limit: messageCount });
+              const messageArray = Array.from(fetchedMessages.values()).reverse();
+
+              // Add messages to context
+              for (const msg of messageArray) {
+                if (msg.content) {
+                  messages.push({
+                    role: msg.author.bot ? 'assistant' : 'user',
+                    content: msg.content
+                  });
+                }
+              }
+              log('info', `[Claude] Added ${messages.length} messages to context`);
+            } catch (fetchError) {
+              log('warning', `[Claude] Could not fetch messages: ${fetchError.message}`);
+              // Continue without previous messages
+            }
+          }
+
+          // Add the current prompt
+          messages.push({
+            role: 'user',
+            content: prompt
+          });
+
+          // Build request body using AI config settings
+          const requestBody = {
+            model: aiConfig.model || 'claude-3-5-sonnet-20241022',
+            max_tokens: aiConfig.maxTokens || 4096,
+            messages: messages
+          };
+
+          // Add temperature if specified
+          if (aiConfig.temperature !== undefined) {
+            requestBody.temperature = aiConfig.temperature;
+          }
+
+          // Add system prompt from AI config if provided
+          if (aiConfig.systemPrompt) {
+            requestBody.system = aiConfig.systemPrompt;
+          }
+
+          log('info', `[Claude] Making API request (model: ${requestBody.model}, tokens: ${requestBody.max_tokens})`);
+
+          // Make API call using https
+          const https = require('https');
+          const postData = JSON.stringify(requestBody);
+
+          const options = {
+            hostname: 'api.anthropic.com',
+            port: 443,
+            path: '/v1/messages',
+            method: 'POST',
+            headers: {
+              'x-api-key': aiConfig.apiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+              'Content-Length': Buffer.byteLength(postData)
+            }
+          };
+
+          const response = await new Promise((resolve, reject) => {
+            const req = https.request(options, (res) => {
+              let data = '';
+              res.on('data', (chunk) => {
+                data += chunk;
+              });
+              res.on('end', () => {
+                try {
+                  const parsedResponse = JSON.parse(data);
+                  if (parsedResponse.error) {
+                    reject(new Error(parsedResponse.error.message || 'Claude API error'));
+                  } else {
+                    resolve(parsedResponse);
+                  }
+                } catch (error) {
+                  reject(new Error('Failed to parse Claude API response: ' + error.message));
+                }
+              });
+            });
+
+            req.on('error', (error) => {
+              reject(new Error('Claude API request failed: ' + error.message));
+            });
+
+            req.write(postData);
+            req.end();
+          });
+
+          // Extract response text
+          if (response.content && response.content.length > 0) {
+            const responseText = response.content[0].text;
+            log('success', `[Claude] Response received (${responseText.length} chars)`);
+            return { response: responseText, error: '' };
+          } else {
+            log('warning', '[Claude] No content in response');
+            return { response: '', error: 'No response from Claude API' };
+          }
+        } catch (error) {
+          log('error', `[Claude] API call failed: ${error.message}`);
+          return { response: '', error: error.message };
+        }
+        } catch (error) {
+          log('error', `[Claude] Initialization error: ${error.message}`);
+          log('error', `[Claude] Stack: ${error.stack}`);
+          return { response: '', error: `Setup error: ${error.message}` };
+        }
       }
 
       default:

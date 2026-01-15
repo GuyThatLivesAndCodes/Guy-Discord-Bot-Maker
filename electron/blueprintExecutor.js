@@ -15,10 +15,11 @@ async function executeBlueprintFlow(eventNode, flowData, context, client) {
 
   client.log('info', `[BP] executeBlueprintFlow: node=${eventNode.id}`);
 
-  // Add Discord client to context
+  // Add Discord client and AI configs to context
   const fullContext = {
     ...context,
     client,
+    aiConfigs: client.config?.aiConfigs || [],
   };
 
   // Execute the flow
